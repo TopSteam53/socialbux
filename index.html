@@ -24,7 +24,7 @@
 <body>
     <div id="root"></div>
 
-    <!-- ПОДКЛЮЧАЕМ БАЗУ ДАННЫХ (FIREBASE) - ДОБАВЛЕН deleteDoc -->
+    <!-- ПОДКЛЮЧАЕМ БАЗУ ДАННЫХ (FIREBASE) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -67,6 +67,10 @@
           const [isAdmin, setIsAdmin] = useState(false);
           const [dbUser, setDbUser] = useState(null); 
           const [allTasks, setAllTasks] = useState([]); 
+          
+          // СОСТОЯНИЕ ДЛЯ СПИСКА ЮЗЕРОВ (АДМИНКА)
+          const [allUsers, setAllUsers] = useState([]);
+          const [searchUser, setSearchUser] = useState('');
 
           const [isDarkMode, setIsDarkMode] = useState(false);
           const toggleTheme = () => setIsDarkMode(!isDarkMode);
@@ -93,7 +97,20 @@
                         setTgUser(tg.initDataUnsafe.user);
                         userId = tg.initDataUnsafe.user.id.toString();
                         userName = tg.initDataUnsafe.user.first_name;
-                        if (userId === MY_ADMIN_ID.toString()) setIsAdmin(true);
+                        
+                        // ПРОВЕРКА НА АДМИНА
+                        if (userId === MY_ADMIN_ID.toString()) {
+                            setIsAdmin(true);
+                            
+                            // АДМИНУ ГРУЗИМ ВСЕХ ЮЗЕРОВ
+                            const usersRef = collection(db, "users");
+                            onSnapshot(usersRef, (snap) => {
+                                const uArr = [];
+                                snap.forEach(doc => uArr.push({ id: doc.id, ...doc.data() }));
+                                uArr.sort((a,b) => new Date(b.joinedAt || 0).getTime() - new Date(a.joinedAt || 0).getTime());
+                                setAllUsers(uArr);
+                            });
+                        }
                     }
                     startParam = tg.initDataUnsafe?.start_param; 
                 }
@@ -177,7 +194,7 @@
           const [botIsAdminChecked, setBotIsAdminChecked] = useState(false); 
 
           // === СОСТОЯНИЯ АДМИНКИ ===
-          const [adminTab, setAdminTab] = useState('add'); // Вкладки внутри админки: 'add', 'tasks', 'users'
+          const [adminTab, setAdminTab] = useState('add'); 
           const [adminTaskForm, setAdminTaskForm] = useState({ platform: 'telegram', type: 'Подписка', link: '', reward: 1.5, maxCount: 10 });
           const [adminBalanceForm, setAdminBalanceForm] = useState({ targetId: '', amount: 0 });
 
@@ -525,8 +542,8 @@
                                 </div>
                                 
                                 {pendingTask === task.id ? (
-                                    <button onClick={() => handleVerifyTask(task)} disabled={checkingTask === task.id} className={`min-w-[90px] font-bold py-2 px-3 rounded-xl text-sm flex justify-center items-center transition-colors shadow-sm ${checkingTask === task.id ? 'bg-slate-100 text-slate-400' : 'bg-green-500 text-white hover:bg-green-600 active:scale-95'}`}>
-                                        {checkingTask === task.id ? <i className="fa-solid fa-spinner fa-spin text-slate-500" style={{fontSize: '18px'}}></i> : `Проверить`}
+                                    <button onClick={() => handleVerifyTask(task)} disabled={checkingTask === task.id} className={`min-w-[90px] font-bold py-2 px-3 rounded-xl text-sm flex justify-center items-center transition-colors shadow-sm ${checkingTask === task.id ? 'bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500' : 'bg-green-500 text-white hover:bg-green-600 active:scale-95'}`}>
+                                        {checkingTask === task.id ? <i className="fa-solid fa-spinner fa-spin" style={{fontSize: '18px'}}></i> : `Проверить`}
                                     </button>
                                 ) : (
                                     <button onClick={() => handleOpenLink(task)} className="min-w-[90px] bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-bold py-2 px-3 rounded-xl text-sm hover:bg-indigo-100 flex justify-center items-center transition-colors active:scale-95">
@@ -696,6 +713,7 @@
                       </div>
 
                       <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
+                         {/* КНОПКА ПОДДЕРЖКИ ВЕРНУЛАСЬ! */}
                          <button onClick={() => setModal('support')} className="w-full flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                            <div className="flex items-center gap-3">
                              <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
@@ -729,17 +747,21 @@
                     </div>
                   )}
 
-                  {/* --- АДМИНКА (ПЕРЕПИСАННАЯ) --- */}
+                  {/* --- АДМИНКА (С БАЗОЙ ЮЗЕРОВ) --- */}
                   {activeTab === 'admin' && isAdmin && (
                     <div className="animate-in fade-in duration-300 space-y-4">
                       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-3xl shadow-xl relative overflow-hidden">
                         <i className="fa-solid fa-crown absolute -right-4 -top-4 opacity-10" style={{fontSize: '120px'}}></i>
                         <h2 className="font-black text-2xl flex items-center gap-2 relative z-10"><i className="fa-solid fa-shield-halved"></i> Админка</h2>
                         
-                        <div className="flex gap-4 mt-4 relative z-10">
+                        <div className="flex gap-6 mt-4 relative z-10">
                             <div>
                                 <p className="text-[10px] text-purple-200 uppercase font-bold tracking-wider">Всего заданий</p>
                                 <p className="font-black text-2xl">{allTasks.length}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-purple-200 uppercase font-bold tracking-wider">Юзеров в базе</p>
+                                <p className="font-black text-2xl">{allUsers.length}</p>
                             </div>
                         </div>
                       </div>
@@ -747,8 +769,8 @@
                       {/* НАВИГАЦИЯ АДМИНКИ */}
                       <div className="flex bg-slate-200/50 dark:bg-slate-800 p-1 rounded-xl">
                         <button onClick={() => setAdminTab('add')} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${adminTab === 'add' ? 'bg-white dark:bg-slate-700 shadow-sm text-purple-600 dark:text-purple-400' : 'text-slate-500 dark:text-slate-400'}`}>Создать</button>
-                        <button onClick={() => setAdminTab('tasks')} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${adminTab === 'tasks' ? 'bg-white dark:bg-slate-700 shadow-sm text-purple-600 dark:text-purple-400' : 'text-slate-500 dark:text-slate-400'}`}>База заданий</button>
-                        <button onClick={() => setAdminTab('users')} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${adminTab === 'users' ? 'bg-white dark:bg-slate-700 shadow-sm text-purple-600 dark:text-purple-400' : 'text-slate-500 dark:text-slate-400'}`}>Балансы</button>
+                        <button onClick={() => setAdminTab('tasks')} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${adminTab === 'tasks' ? 'bg-white dark:bg-slate-700 shadow-sm text-purple-600 dark:text-purple-400' : 'text-slate-500 dark:text-slate-400'}`}>Задания</button>
+                        <button onClick={() => setAdminTab('users')} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${adminTab === 'users' ? 'bg-white dark:bg-slate-700 shadow-sm text-purple-600 dark:text-purple-400' : 'text-slate-500 dark:text-slate-400'}`}>Юзеры</button>
                       </div>
 
                       {/* ВКЛАДКА: СОЗДАТЬ ЗАДАНИЕ */}
@@ -784,7 +806,7 @@
                           </form>
                       )}
 
-                      {/* ВКЛАДКА: УПРАВЛЕНИЕ ЗАДАНИЯМИ */}
+                      {/* ВКЛАДКА: ЗАДАНИЯ */}
                       {adminTab === 'tasks' && (
                           <div className="space-y-3 animate-in fade-in">
                             {allTasks.length === 0 ? <p className="text-center text-slate-500 text-sm py-4 border border-dashed border-slate-200 rounded-2xl">Нет заданий в базе</p> : allTasks.map(task => (
@@ -805,25 +827,88 @@
                           </div>
                       )}
 
-                      {/* ВКЛАДКА: БАЛАНСЫ */}
+                      {/* ВКЛАДКА: ЮЗЕРЫ (БАЗА И ПОПОЛНЕНИЕ) */}
                       {adminTab === 'users' && (
-                          <form onSubmit={handleAdminChangeBalance} className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-4 animate-in fade-in">
-                            <h3 className="font-bold text-sm text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                               <i className="fa-solid fa-coins text-green-500"></i> Ручное пополнение
-                            </h3>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Мгновенно изменит баланс юзера в базе</p>
-                            <input type="number" placeholder="ID юзера (из таблицы)" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-mono dark:text-white transition-colors focus:border-green-500" value={adminBalanceForm.targetId} onChange={e => setAdminBalanceForm({...adminBalanceForm, targetId: e.target.value})} />
-                            <div className="flex gap-2 items-center">
-                              <input type="number" placeholder="Сумма (₽)" required className="w-2/3 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold text-green-600 dark:text-green-400 transition-colors focus:border-green-500" value={adminBalanceForm.amount || ''} onChange={e => setAdminBalanceForm({...adminBalanceForm, amount: parseInt(e.target.value) || 0})} />
-                              <button type="submit" className="w-1/3 bg-green-500 hover:bg-green-400 text-white font-bold py-3 rounded-xl transition-colors shadow-md shadow-green-500/30">Выдать</button>
-                            </div>
-                          </form>
+                          <div className="space-y-4 animate-in fade-in">
+                              <form onSubmit={handleAdminChangeBalance} className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-4">
+                                <h3 className="font-bold text-sm text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                                   <i className="fa-solid fa-coins text-green-500"></i> Ручное пополнение
+                                </h3>
+                                <input type="number" placeholder="ID юзера" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-mono dark:text-white transition-colors focus:border-green-500" value={adminBalanceForm.targetId} onChange={e => setAdminBalanceForm({...adminBalanceForm, targetId: e.target.value})} />
+                                <div className="flex gap-2 items-center">
+                                  <input type="number" placeholder="Сумма (₽)" required className="w-2/3 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold text-green-600 dark:text-green-400 transition-colors focus:border-green-500" value={adminBalanceForm.amount || ''} onChange={e => setAdminBalanceForm({...adminBalanceForm, amount: parseInt(e.target.value) || 0})} />
+                                  <button type="submit" className="w-1/3 bg-green-500 hover:bg-green-400 text-white font-bold py-3 rounded-xl transition-colors shadow-md shadow-green-500/30">Выдать</button>
+                                </div>
+                              </form>
+
+                              {/* СПИСОК ЮЗЕРОВ С ПОИСКОМ */}
+                              <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700">
+                                  <div className="flex flex-col gap-3 mb-4">
+                                      <h3 className="font-bold text-sm text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                                          <i className="fa-solid fa-users text-blue-500"></i> База клиентов
+                                      </h3>
+                                      <div className="relative">
+                                          <i className="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                          <input type="text" placeholder="Поиск по ID или имени..." value={searchUser} onChange={e => setSearchUser(e.target.value)} className="w-full pl-8 pr-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none text-sm dark:text-white transition-colors focus:border-blue-500" />
+                                      </div>
+                                  </div>
+                                  
+                                  <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1 scrollbar-hide">
+                                      {allUsers.filter(u => u.id.includes(searchUser) || (u.name || '').toLowerCase().includes(searchUser.toLowerCase())).slice(0, 50).map(u => (
+                                          <div key={u.id} className="flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800">
+                                              <div className="flex items-center gap-3">
+                                                  <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs">
+                                                      {(u.name || 'U').charAt(0).toUpperCase()}
+                                                  </div>
+                                                  <div>
+                                                      <p className="text-xs font-bold text-slate-800 dark:text-white line-clamp-1">{u.name}</p>
+                                                      <p className="text-[10px] text-slate-400 font-mono mt-0.5">{u.id}</p>
+                                                  </div>
+                                              </div>
+                                              <div className="text-right">
+                                                  <p className="text-xs font-black text-green-500">{u.balance?.toFixed(2) || '0.00'} ₽</p>
+                                                  {u.referrerId && <p className="text-[8px] text-purple-400 mt-0.5 font-bold">Реф: {u.referrerId.slice(-4)}</p>}
+                                              </div>
+                                          </div>
+                                      ))}
+                                      {allUsers.length === 0 && <p className="text-center text-xs text-slate-400 py-4">База пуста</p>}
+                                  </div>
+                              </div>
+                          </div>
                       )}
                     </div>
                   )}
                 </main>
 
                 {/* МОДАЛКИ */}
+                {modal === 'support' && (
+                  <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[200] flex items-end animate-in fade-in duration-200">
+                     <div className="bg-white dark:bg-slate-800 w-full rounded-t-3xl p-6 h-[80vh] flex flex-col animate-in slide-in-from-bottom-full duration-300">
+                        <div className="flex justify-between items-center mb-6">
+                          <h3 className="font-bold text-xl text-slate-800 dark:text-white flex items-center gap-2">
+                            <i className="fa-solid fa-circle-question text-indigo-500"></i> Поддержка
+                          </h3>
+                          <button onClick={() => setModal(null)} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-full text-slate-500 dark:text-slate-300 transition-colors hover:bg-slate-200"><i className="fa-solid fa-xmark" style={{fontSize: '20px'}}></i></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+                          <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+                            <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-1">Как быстро приходят деньги?</h4>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">Деньги за задания зачисляются на баланс сразу после прохождения таймера проверки (3-5 секунд).</p>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+                            <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-1">Возникли проблемы?</h4>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">Если у вас не засчиталось задание или пропали деньги, свяжитесь напрямую с основателем проекта.</p>
+                          </div>
+                        </div>
+                        <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-700">
+                          <button onClick={() => { setModal(null); window.open(`https://t.me/${ADMIN_TG.replace('@', '')}`); }} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-colors shadow-md shadow-indigo-500/20">
+                            <i className="fa-solid fa-message" style={{fontSize: '20px'}}></i> Связаться с {ADMIN_TG}
+                          </button>
+                        </div>
+                     </div>
+                  </div>
+                )}
+
                 {modal === 'deposit' && (
                   <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[150] flex items-end animate-in fade-in duration-200">
                      <div className="bg-white dark:bg-slate-800 w-full rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-full duration-300">
