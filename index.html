@@ -24,13 +24,13 @@
 <body>
     <div id="root"></div>
 
-    <!-- 1. ПОДКЛЮЧАЕМ БАЗУ ДАННЫХ (FIREBASE) -->
+    <!-- ПОДКЛЮЧАЕМ БАЗУ ДАННЫХ (FIREBASE) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, updateDoc, collection, onSnapshot, addDoc, increment, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // ТВОИ КЛЮЧИ!
+        // ТВОИ КЛЮЧИ
         const firebaseConfig = {
             apiKey: "AIzaSyAo71G46ktPo30MtjCgmtuMh8fH6c_fjX0",
             authDomain: "socialbux.firebaseapp.com",
@@ -44,57 +44,44 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // Передаем функции в React
         window.FirebaseSDK = { auth, db, signInAnonymously, doc, setDoc, updateDoc, collection, onSnapshot, addDoc, increment, arrayUnion };
     </script>
 
-    <!-- 2. ЛОГИКА ПРИЛОЖЕНИЯ (REACT) -->
+    <!-- ЛОГИКА ПРИЛОЖЕНИЯ -->
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // === НАСТРОЙКИ ===
         const MAKE_WEBHOOK_URL = "https://hook.eu1.make.com/18jk32udu658rvw34jlynirj1chkslo9";
         const ADMIN_TG = "@makaroff_53"; 
         const BOT_USERNAME = "@SocialBux_bot"; 
         const ADMIN_PHONE = "89524839430"; 
         const ADMIN_BANK = "Сбербанк"; 
-        const MY_ADMIN_ID = 1014857955; // Твой ID
+        const MY_ADMIN_ID = 1014857955; 
 
-        // === ИКОНКИ ===
         const VkIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M13.162 18.994c.609 0 .858-.406.851-.915-.031-1.917.714-2.949 2.059-1.604 1.488 1.488 1.796 2.519 3.603 2.519h3.2c.808 0 1.126-.26 1.126-.668 0-.863-1.421-2.386-2.625-3.504-1.686-1.543-1.675-1.562 0-3.321C22.616 9.873 23.36 7.424 23.36 6.313c0-.422-.21-.63-.615-.63h-3.351c-.609 0-.858.406-1.144 1.096-1.686 3.666-3.87 6.136-4.664 6.136-.363 0-.585-.406-.585-1.146V6.313c0-.609-.153-.915-.656-.915h-4.32c-.416 0-.66.244-.66.52 0 .548.746.671.821 2.213v3.313c0 .813-.243.916-.604.916-1.282 0-3.791-2.909-5.187-5.836-.265-.548-.568-.863-1.282-.863H.77c-.503 0-.68.243-.68.52 0 .584.717 3.208 3.393 6.84 2.158 2.871 4.793 4.935 7.68 4.935z"/></svg>);
         const TiktokIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93v7.2c0 1.94-.8 3.8-2.26 5.15-1.46 1.34-3.4 2.1-5.4 2.1-2.01 0-3.95-.76-5.41-2.11C2.08 19.06 1.28 17.2 1.28 15.26c0-1.94.8-3.8 2.26-5.15 1.46-1.34 3.4-2.1 5.4-2.1h.67v4.03c-.23-.03-.45-.04-.67-.04-1.2 0-2.35.47-3.2 1.32-.85.85-1.33 2-1.33 3.2 0 1.2.48 2.35 1.33 3.2.85.85 2 1.33 3.2 1.33 1.2 0 2.35-.48 3.2-1.33.85-.85 1.33-2 1.33-3.2V.02z"/></svg>);
         const TelegramIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.223-.548.223l.188-2.85 5.18-4.686c.223-.204-.054-.31-.346-.116l-6.405 4.026-2.76-.86c-.6-.188-.614-.6.126-.89l10.785-4.158c.5-.184.956.12.88.541z"/></svg>);
 
         function App() {
-          const [tgUser, setTgUser] = useState({ id: '987654321', first_name: 'Пользователь' });
+          const [tgUser, setTgUser] = useState({ id: '987654321', first_name: 'Пользователь', photo_url: null });
           const [isAppLoading, setIsAppLoading] = useState(true);
           const [isAdmin, setIsAdmin] = useState(false);
+          const [dbUser, setDbUser] = useState(null); 
+          const [allTasks, setAllTasks] = useState([]); 
 
-          // === СОСТОЯНИЯ ИЗ БАЗЫ ДАННЫХ ===
-          const [dbUser, setDbUser] = useState(null); // Профиль юзера из базы
-          const [allTasks, setAllTasks] = useState([]); // Все задания из базы
-
-          // UI Состояния
           const [isDarkMode, setIsDarkMode] = useState(false);
-          const [activeTab, setActiveTab] = useState('earn'); 
+          const toggleTheme = () => setIsDarkMode(!isDarkMode);
+
           const [notification, setNotification] = useState(null);
-          const [taskFilter, setTaskFilter] = useState('all');
-          const [checkingTask, setCheckingTask] = useState(null);
-          const [orderTab, setOrderTab] = useState('new');
-          const [copied, setCopied] = useState(false);
-          const [modal, setModal] = useState(null); 
-          const [promoCode, setPromoCode] = useState('');
-          const [orderForm, setOrderForm] = useState({ platform: 'telegram', action: 'subscribe', link: '', count: 10 });
-          const [botIsAdminChecked, setBotIsAdminChecked] = useState(false); 
+          const showNotif = (msg, type = 'success') => {
+            setNotification({ msg, type });
+            setTimeout(() => setNotification(null), 4000);
+          };
 
-          const [adminTaskForm, setAdminTaskForm] = useState({ platform: 'telegram', type: 'Подписка', link: '', reward: 1.5, maxCount: 10 });
-          const [adminBalanceForm, setAdminBalanceForm] = useState({ targetId: '', amount: 0 });
-
-          // ИНИЦИАЛИЗАЦИЯ
           useEffect(() => {
             const initCloud = async () => {
-                if (!window.FirebaseSDK) return setTimeout(initCloud, 100);
-                const { auth, db, signInAnonymously, doc, setDoc, updateDoc, collection, onSnapshot, increment } = window.FirebaseSDK;
+                if (!window.FirebaseSDK) return setTimeout(initCloud, 200);
+                const { auth, db, signInAnonymously, doc, setDoc, collection, onSnapshot } = window.FirebaseSDK;
 
                 let userId = '987654321';
                 let userName = 'Пользователь';
@@ -111,68 +98,71 @@
                 }
 
                 try {
-                    // 1. Анонимная авторизация в облаке
                     await signInAnonymously(auth);
 
-                    // 2. Слушаем профиль пользователя в реальном времени
                     const userRef = doc(db, "users", userId);
                     onSnapshot(userRef, (docSnap) => {
                         if (docSnap.exists()) {
                             setDbUser(docSnap.data());
                         } else {
-                            // Если юзер зашел впервые - создаем ему профиль
                             setDoc(userRef, {
                                 balance: 0,
                                 bonusClaimed: false,
                                 usedPromos: [],
-                                completedTasks: [], // Задания, которые он уже сделал
-                                myOrders: [], // Заказы, которые он создал
+                                completedTasks: [], 
+                                myOrders: [], 
                                 name: userName,
                                 joinedAt: new Date().toISOString()
                             });
                         }
-                        setIsAppLoading(false);
+                        setIsAppLoading(false); 
+                    }, (err) => {
+                        showNotif('Ошибка доступа к базе данных.', 'error');
+                        setIsAppLoading(false); 
                     });
 
-                    // 3. Слушаем все задания в реальном времени
                     const tasksRef = collection(db, "tasks");
                     onSnapshot(tasksRef, (querySnapshot) => {
                         const tasksArray = [];
                         querySnapshot.forEach((doc) => {
                             tasksArray.push({ id: doc.id, ...doc.data() });
                         });
-                        // Сортируем: сначала новые
                         tasksArray.sort((a, b) => b.createdAt - a.createdAt);
                         setAllTasks(tasksArray);
                     });
 
                 } catch (error) {
-                    console.error("Firebase Error:", error);
-                    showNotif('Ошибка подключения к базе', 'error');
+                    showNotif('Ошибка! Включите Anonymous Auth в Firebase.', 'error');
+                    setIsAppLoading(false); 
                 }
             };
             initCloud();
           }, []);
 
-          // === ДАННЫЕ ДЛЯ UI ===
-          // Вычисляем баланс (если базы еще нет, пишем 0)
           const balance = dbUser?.balance || 0;
-          
-          // Показываем бонус, только если в базе написано false
           const showWelcome = dbUser ? !dbUser.bonusClaimed : false;
 
-          // Фильтруем задания: показываем только те, что юзер ЕЩЕ НЕ ДЕЛАЛ и где ЕСТЬ МЕСТА
           const availableTasks = allTasks.filter(t => {
               const alreadyDid = dbUser?.completedTasks?.includes(t.id);
               const hasSpots = t.currentCount < t.maxCount;
               return !alreadyDid && hasSpots;
           });
 
-          // Заказы, которые создал этот юзер
           const myOrders = dbUser?.myOrders || [];
 
+          const [activeTab, setActiveTab] = useState('earn'); 
+          const [taskFilter, setTaskFilter] = useState('all');
+          const [checkingTask, setCheckingTask] = useState(null);
+          const [orderTab, setOrderTab] = useState('new');
+          const [copied, setCopied] = useState(false);
+          const [modal, setModal] = useState(null); 
+          const [promoCode, setPromoCode] = useState('');
+          const [orderForm, setOrderForm] = useState({ platform: 'telegram', action: 'subscribe', link: '', count: 10 });
+          const [botIsAdminChecked, setBotIsAdminChecked] = useState(false); 
 
-          // === ЦЕНЫ И ПРАЙСЫ ===
+          const [adminTaskForm, setAdminTaskForm] = useState({ platform: 'telegram', type: 'Подписка', link: '', reward: 1.5, maxCount: 10 });
+          const [adminBalanceForm, setAdminBalanceForm] = useState({ targetId: '', amount: 0 });
+
           const actionTypes = {
             telegram: [{id: 'subscribe', label: 'Подписчики', price: 1.50}, {id: 'view', label: 'Просмотры', price: 0.10}, {id: 'reaction', label: 'Реакции', price: 0.20}],
             vk: [{id: 'subscribe', label: 'Подписчики', price: 1.00}, {id: 'like', label: 'Лайки', price: 0.30}],
@@ -184,20 +174,12 @@
           const currentPrice = currentActionObj ? currentActionObj.price : 0;
           const totalCost = (orderForm.count || 0) * currentPrice;
 
-
-          // === УТИЛИТЫ ===
-          const toggleTheme = () => setIsDarkMode(!isDarkMode);
-
           const handlePlatformChange = (p) => {
             const firstAction = actionTypes[p][0].id;
             setOrderForm({...orderForm, platform: p, action: firstAction});
           };
 
-          const showNotif = (msg, type = 'success') => {
-            setNotification({ msg, type });
-            setTimeout(() => setNotification(null), 3000);
-          };
-
+          // ЧЕТКАЯ ОТПРАВКА В MAKE.COM ДЛЯ ТАБЛИЦЫ
           const sendToMake = async (payload) => {
             try {
               fetch(MAKE_WEBHOOK_URL, {
@@ -208,76 +190,66 @@
             } catch (e) {}
           };
 
-
-          // === ОСНОВНЫЕ ДЕЙСТВИЯ (ОБЛАКО) ===
-          
           const claimWelcomeBonus = async () => {
             if (dbUser?.bonusClaimed) return;
             const { db, doc, updateDoc, increment } = window.FirebaseSDK;
             const userRef = doc(db, "users", tgUser.id.toString());
-            
-            // Обновляем в облаке
-            await updateDoc(userRef, {
-                balance: increment(30.00),
-                bonusClaimed: true
-            });
-            
+            await updateDoc(userRef, { balance: increment(30.00), bonusClaimed: true });
             showNotif('Ура! 30 ₽ зачислены на баланс', 'success');
-            sendToMake({ action: 'welcome_bonus', amount: 30, link: 'Бонус за регу' });
+            sendToMake({ action: 'Получил бонус', amount: 30, link: 'Стартовый бонус' });
           };
 
           const handleApplyPromo = async () => {
             if (!promoCode.trim()) return;
             const code = promoCode.toUpperCase();
-            
             if (dbUser?.usedPromos?.includes(code)) return showNotif('Вы уже использовали этот код!', 'error');
             
             if (code === 'TIKTOK50') {
               const { db, doc, updateDoc, increment, arrayUnion } = window.FirebaseSDK;
               const userRef = doc(db, "users", tgUser.id.toString());
-              
-              await updateDoc(userRef, {
-                  balance: increment(50),
-                  usedPromos: arrayUnion(code)
-              });
-
+              await updateDoc(userRef, { balance: increment(50), usedPromos: arrayUnion(code) });
               showNotif('Промокод применен! +50 ₽', 'success');
               setPromoCode('');
-              sendToMake({ action: 'promo_code', amount: 50, link: code });
+              sendToMake({ action: 'Активировал промокод', amount: 50, link: code });
             } else {
               showNotif('Неверный или просроченный промокод', 'error');
             }
           };
 
+          // === ТЕПЕРЬ ОТКРЫВАЕМ ССЫЛКУ И ЖДЕМ ===
           const handleDoTask = async (task) => {
             setCheckingTask(task.id);
+            
+            // ПЕРЕКИДЫВАЕМ ЮЗЕРА НА ССЫЛКУ ЗАДАНИЯ
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+                window.Telegram.WebApp.openLink(task.link);
+            } else {
+                window.open(task.link, '_blank');
+            }
+
             const { db, doc, updateDoc, increment, arrayUnion } = window.FirebaseSDK;
             
-            // Имитация проверки (2 секунды)
+            // ЖДЕМ 4 СЕКУНДЫ (ТИПА ПРОВЕРЯЕМ ПОДПИСКУ)
             setTimeout(async () => {
               try {
                   const userRef = doc(db, "users", tgUser.id.toString());
                   const taskRef = doc(db, "tasks", task.id);
 
-                  // 1. Даем деньги и записываем в выполненные
                   await updateDoc(userRef, {
                       balance: increment(task.reward),
                       completedTasks: arrayUnion(task.id)
                   });
 
-                  // 2. Увеличиваем счетчик у задания
-                  await updateDoc(taskRef, {
-                      currentCount: increment(1)
-                  });
+                  await updateDoc(taskRef, { currentCount: increment(1) });
 
                   setCheckingTask(null);
                   showNotif(`Выполнено! +${task.reward} ₽`);
-                  sendToMake({ action: 'task_completed', amount: task.reward, link: task.title });
+                  sendToMake({ action: 'Выполнил задание', amount: task.reward, link: task.link });
               } catch (e) {
                   showNotif('Ошибка! Задание уже недоступно', 'error');
                   setCheckingTask(null);
               }
-            }, 2000);
+            }, 4000); // 4000 миллисекунд = 4 секунды ожидания
           };
 
           const executeOrder = async () => {
@@ -288,7 +260,6 @@
             const rewardPerTask = parseFloat((currentPrice * 0.5).toFixed(2));
 
             try {
-                // 1. Снимаем деньги и добавляем заказ в профиль юзера
                 const userRef = doc(db, "users", tgUser.id.toString());
                 await updateDoc(userRef, {
                     balance: increment(-totalCost),
@@ -303,7 +274,6 @@
                     })
                 });
 
-                // 2. Создаем ПУБЛИЧНОЕ задание в ленте для всех
                 await addDoc(collection(db, "tasks"), {
                     platform: orderForm.platform,
                     type: actionLabel,
@@ -317,7 +287,7 @@
                 });
 
                 showNotif(`Заказ на ${totalCost.toFixed(2)} ₽ успешно создан!`, 'success');
-                sendToMake({ action: 'create_order', amount: -totalCost, link: orderForm.link });
+                sendToMake({ action: 'Создал заказ', amount: -totalCost, link: orderForm.link });
                 setOrderForm({ ...orderForm, link: '', count: 10 });
                 setBotIsAdminChecked(false); 
                 setModal(null); 
@@ -338,11 +308,9 @@
             executeOrder();
           };
 
-          // === ФУНКЦИИ АДМИНА ===
           const handleAdminAddTask = async (e) => {
              e.preventDefault();
              if (!adminTaskForm.link.startsWith('http')) return showNotif('Укажи нормальную ссылку', 'error');
-             
              const { db, collection, addDoc } = window.FirebaseSDK;
              
              await addDoc(collection(db, "tasks"), {
@@ -358,23 +326,32 @@
              });
 
              showNotif('Задание отправлено в облако!', 'success');
-             sendToMake({ action: 'admin_add_task', link: adminTaskForm.link, amount: adminTaskForm.reward });
+             sendToMake({ action: 'АДМИН: Добавил задание', amount: 0, link: adminTaskForm.link });
              setAdminTaskForm({...adminTaskForm, link: ''});
           };
 
           const handleAdminChangeBalance = async (e) => {
              e.preventDefault();
              if (!adminBalanceForm.targetId) return showNotif('Укажи ID', 'error');
-             
              const { db, doc, updateDoc, increment } = window.FirebaseSDK;
              
              try {
                  const targetRef = doc(db, "users", adminBalanceForm.targetId.toString());
-                 await updateDoc(targetRef, {
-                     balance: increment(adminBalanceForm.amount)
-                 });
+                 await updateDoc(targetRef, { balance: increment(adminBalanceForm.amount) });
                  
-                 sendToMake({ action: 'admin_change_balance', telegramId: adminBalanceForm.targetId, amount: adminBalanceForm.amount, link: 'Ручное пополнение' });
+                 // Шлем лог с ID ТОГО ЧЕЛОВЕКА, кому пополнили
+                 fetch(MAKE_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        telegramId: adminBalanceForm.targetId, 
+                        userName: "Выдача баланса",
+                        action: 'АДМИН: Изменил баланс', 
+                        amount: adminBalanceForm.amount, 
+                        link: 'Ручная операция' 
+                    })
+                 });
+
                  showNotif(`Баланс юзера пополнен!`, 'success');
                  setAdminBalanceForm({ targetId: '', amount: 0 });
              } catch (err) {
@@ -382,7 +359,6 @@
              }
           };
 
-          // === UI КОМПОНЕНТЫ ===
           const PlatformIcon = ({ platform, size = 20, className = "" }) => {
             switch(platform) {
               case 'telegram': return <TelegramIcon size={size} className={`text-[#2AABEE] ${className}`} />;
@@ -415,7 +391,13 @@
 
           if (isAppLoading) {
             return (
-              <div className="flex flex-col items-center justify-center h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+              <div className="flex flex-col items-center justify-center h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300 relative">
+                {notification && (
+                  <div className="absolute top-10 left-4 right-4 p-4 rounded-2xl shadow-xl flex items-center gap-3 z-[250] bg-red-500 text-white font-medium animate-in slide-in-from-top-4">
+                    <i className="fa-solid fa-circle-exclamation text-xl"></i>
+                    <p className="text-sm">{notification.msg}</p>
+                  </div>
+                )}
                 <i className="fa-solid fa-circle-notch fa-spin text-indigo-500 mb-4" style={{fontSize: '48px'}}></i>
                 <p className="text-slate-500 dark:text-slate-400 font-medium animate-pulse">Соединение с облаком...</p>
               </div>
@@ -432,7 +414,6 @@
                     <div className="bg-white dark:bg-slate-800 w-full rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
                       <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 relative z-10 shadow-lg shadow-indigo-500/30">
                         <i className="fa-solid fa-gift text-white" style={{fontSize: '40px'}}></i>
-                        <i className="fa-solid fa-wand-magic-sparkles text-yellow-300 absolute -top-1 -right-1 animate-pulse" style={{fontSize: '24px'}}></i>
                       </div>
                       <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Привет, {tgUser.first_name}!</h2>
                       <p className="text-slate-500 dark:text-slate-400 mb-6 font-medium text-sm">Мы дарим тебе стартовый бонус, чтобы ты сразу мог начать зарабатывать.</p>
@@ -464,9 +445,7 @@
                   </div>
                 </header>
 
-                {/* === КОНТЕНТ === */}
                 <main className="flex-1 overflow-y-auto p-4 pb-28">
-                  
                   {/* --- ЗАРАБОТАТЬ --- */}
                   {activeTab === 'earn' && (
                     <div className="animate-in fade-in duration-300 space-y-4">
@@ -596,7 +575,6 @@
                             </div>
                           ) : (
                             myOrders.map(order => {
-                              // Находим этот заказ в общей базе, чтобы показать реальный прогресс
                               const cloudTask = allTasks.find(t => t.link === order.link && t.type === order.type);
                               const currentDone = cloudTask ? cloudTask.currentCount : order.done;
                               
@@ -638,9 +616,15 @@
                   {activeTab === 'profile' && (
                     <div className="animate-in fade-in duration-300 space-y-4">
                       <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 text-center relative">
-                        <div className="w-20 h-20 bg-slate-100 dark:bg-slate-700 border-4 border-white dark:border-slate-800 shadow-sm rounded-full flex items-center justify-center mx-auto mb-3 relative z-10">
-                          <i className="fa-solid fa-user text-slate-400 dark:text-slate-500" style={{fontSize: '36px'}}></i>
+                        {/* === АВАТАРКА ТЕЛЕГРАМА === */}
+                        <div className="w-20 h-20 bg-slate-100 dark:bg-slate-700 border-4 border-white dark:border-slate-800 shadow-sm rounded-full flex items-center justify-center mx-auto mb-3 relative z-10 overflow-hidden">
+                          {tgUser.photo_url ? (
+                              <img src={tgUser.photo_url} alt="Аватар" className="w-full h-full object-cover" />
+                          ) : (
+                              <i className="fa-solid fa-user text-slate-400 dark:text-slate-500" style={{fontSize: '36px'}}></i>
+                          )}
                         </div>
+
                         <h2 className="text-xl font-bold text-slate-800 dark:text-white">{tgUser.first_name}</h2>
                         <p className="text-slate-400 dark:text-slate-500 text-sm mb-5 font-medium">ID: {tgUser.id}</p>
                         
@@ -700,7 +684,7 @@
                     </div>
                   )}
 
-                  {/* --- АДМИНКА (ТОЛЬКО ДЛЯ ТЕБЯ) --- */}
+                  {/* --- АДМИНКА --- */}
                   {activeTab === 'admin' && isAdmin && (
                     <div className="animate-in fade-in duration-300 space-y-4">
                       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-3xl shadow-xl relative overflow-hidden">
