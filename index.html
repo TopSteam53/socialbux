@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SocialBux</title>
     
-    <!-- Подключаем стили и библиотеки -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -36,9 +35,9 @@
         const BOT_USERNAME = "@SocialBux_bot"; 
         const ADMIN_PHONE = "89524839430"; 
         const ADMIN_BANK = "Сбербанк"; 
-        const MY_ADMIN_ID = 1014857955; // Твой ID для админки
+        const MY_ADMIN_ID = 1014857955;
 
-        // === КАСТОМНЫЕ ИКОНКИ (SVG) ===
+        // === ИКОНКИ ===
         const VkIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M13.162 18.994c.609 0 .858-.406.851-.915-.031-1.917.714-2.949 2.059-1.604 1.488 1.488 1.796 2.519 3.603 2.519h3.2c.808 0 1.126-.26 1.126-.668 0-.863-1.421-2.386-2.625-3.504-1.686-1.543-1.675-1.562 0-3.321C22.616 9.873 23.36 7.424 23.36 6.313c0-.422-.21-.63-.615-.63h-3.351c-.609 0-.858.406-1.144 1.096-1.686 3.666-3.87 6.136-4.664 6.136-.363 0-.585-.406-.585-1.146V6.313c0-.609-.153-.915-.656-.915h-4.32c-.416 0-.66.244-.66.52 0 .548.746.671.821 2.213v3.313c0 .813-.243.916-.604.916-1.282 0-3.791-2.909-5.187-5.836-.265-.548-.568-.863-1.282-.863H.77c-.503 0-.68.243-.68.52 0 .584.717 3.208 3.393 6.84 2.158 2.871 4.793 4.935 7.68 4.935z"/></svg>);
         const TiktokIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93v7.2c0 1.94-.8 3.8-2.26 5.15-1.46 1.34-3.4 2.1-5.4 2.1-2.01 0-3.95-.76-5.41-2.11C2.08 19.06 1.28 17.2 1.28 15.26c0-1.94.8-3.8 2.26-5.15 1.46-1.34 3.4-2.1 5.4-2.1h.67v4.03c-.23-.03-.45-.04-.67-.04-1.2 0-2.35.47-3.2 1.32-.85.85-1.33 2-1.33 3.2 0 1.2.48 2.35 1.33 3.2.85.85 2 1.33 3.2 1.33 1.2 0 2.35-.48 3.2-1.33.85-.85 1.33-2 1.33-3.2V.02z"/></svg>);
         const TelegramIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.223-.548.223l.188-2.85 5.18-4.686c.223-.204-.054-.31-.346-.116l-6.405 4.026-2.76-.86c-.6-.188-.614-.6.126-.89l10.785-4.158c.5-.184.956.12.88.541z"/></svg>);
@@ -48,11 +47,9 @@
           const [isAppLoading, setIsAppLoading] = useState(true);
           const [isAdmin, setIsAdmin] = useState(false);
 
-          // === ТЕМА (Вот эту строчку я забыл в прошлый раз) ===
           const [isDarkMode, setIsDarkMode] = useState(false);
           const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
-          // === ПАМЯТЬ ПРИЛОЖЕНИЯ ===
           const [balance, setBalance] = useState(() => parseFloat(localStorage.getItem('sb_balance') || '0.00'));
           
           const [showWelcome, setShowWelcome] = useState(() => {
@@ -65,13 +62,11 @@
           const [myOrders, setMyOrders] = useState(() => JSON.parse(localStorage.getItem('sb_orders') || '[]'));
           const [usedPromos, setUsedPromos] = useState(() => JSON.parse(localStorage.getItem('sb_promos') || '[]'));
 
-          // Авто-сохранение в память
           useEffect(() => { localStorage.setItem('sb_balance', balance.toFixed(2)); }, [balance]);
           useEffect(() => { localStorage.setItem('sb_tasks', JSON.stringify(tasks)); }, [tasks]);
           useEffect(() => { localStorage.setItem('sb_orders', JSON.stringify(myOrders)); }, [myOrders]);
           useEffect(() => { localStorage.setItem('sb_promos', JSON.stringify(usedPromos)); }, [usedPromos]);
 
-          // Инициализация Telegram и проверка рефералов
           useEffect(() => {
             let userId = 987654321;
             let userName = 'Пользователь';
@@ -113,7 +108,8 @@
           const [orderForm, setOrderForm] = useState({ platform: 'telegram', action: 'subscribe', link: '', count: 100 });
           const [botIsAdminChecked, setBotIsAdminChecked] = useState(false); 
 
-          const [adminTaskForm, setAdminTaskForm] = useState({ platform: 'telegram', type: 'Подписка', link: '', reward: 1.5 });
+          // Добавлено поле maxCount в админку
+          const [adminTaskForm, setAdminTaskForm] = useState({ platform: 'telegram', type: 'Подписка', link: '', reward: 1.5, maxCount: 10 });
           const [adminBalanceForm, setAdminBalanceForm] = useState({ targetId: '', amount: 0 });
 
           const actionTypes = {
@@ -176,7 +172,17 @@
             setTimeout(() => {
               setCheckingTask(null);
               setBalance(prev => prev + task.reward);
-              setTasks(tasks.filter(t => t.id !== task.id));
+              
+              // Обновляем количество выполнений
+              setTasks(prevTasks => {
+                  return prevTasks.map(t => {
+                      if (t.id === task.id) {
+                          return { ...t, currentCount: (t.currentCount || 0) + 1 };
+                      }
+                      return t;
+                  }).filter(t => (t.currentCount || 0) < (t.maxCount || 999999)); // Удаляем, если лимит исчерпан
+              });
+
               showNotif(`Выполнено! +${task.reward} ₽`);
               sendToDatabase({ action: 'task_completed', amount: task.reward, link: task.title });
             }, 2000);
@@ -200,7 +206,7 @@
             setMyOrders([{ id: Date.now(), platform: orderForm.platform, type: actionLabel, count: orderForm.count, done: 0, status: 'active', link: orderForm.link, spent: totalCost }, ...myOrders]);
             
             const rewardPerTask = currentPrice * 0.5;
-            setTasks([{ id: Date.now(), platform: orderForm.platform, type: actionLabel, reward: parseFloat(rewardPerTask.toFixed(2)), title: orderForm.link.substring(0, 25) + '...', link: orderForm.link }, ...tasks]);
+            setTasks([{ id: Date.now(), platform: orderForm.platform, type: actionLabel, reward: parseFloat(rewardPerTask.toFixed(2)), title: orderForm.link.substring(0, 25) + '...', link: orderForm.link, maxCount: orderForm.count, currentCount: 0 }, ...tasks]);
 
             showNotif(`Заказ на ${totalCost.toFixed(2)} ₽ успешно создан!`, 'success');
             sendToDatabase({ action: 'create_order', amount: -totalCost, link: orderForm.link });
@@ -212,7 +218,18 @@
           const handleAdminAddTask = (e) => {
              e.preventDefault();
              if (!adminTaskForm.link.startsWith('http')) return showNotif('Укажи нормальную ссылку', 'error');
-             setTasks([{ id: Date.now(), platform: adminTaskForm.platform, type: adminTaskForm.type, reward: parseFloat(adminTaskForm.reward), title: adminTaskForm.link.substring(0, 25) + '...', link: adminTaskForm.link }, ...tasks]);
+             
+             setTasks([{ 
+                 id: Date.now(), 
+                 platform: adminTaskForm.platform, 
+                 type: adminTaskForm.type, 
+                 reward: parseFloat(adminTaskForm.reward), 
+                 title: adminTaskForm.link.substring(0, 25) + '...', 
+                 link: adminTaskForm.link,
+                 maxCount: parseInt(adminTaskForm.maxCount) || 10,
+                 currentCount: 0
+             }, ...tasks]);
+             
              showNotif('Задание добавлено в ленту!', 'success');
              sendToDatabase({ action: 'admin_add_task', link: adminTaskForm.link, amount: adminTaskForm.reward });
              setAdminTaskForm({...adminTaskForm, link: ''});
@@ -338,19 +355,25 @@
                           </div>
                         ) : (
                           (taskFilter === 'all' ? tasks : tasks.filter(t => t.platform === taskFilter)).map(task => (
-                            <div key={task.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between active:scale-[0.98] transition-all">
-                              <div className="flex items-center gap-3">
-                                <div className="p-2.5 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-100 dark:border-slate-600">
-                                  <PlatformIcon platform={task.platform} size={22} />
+                            <div key={task.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col gap-3 active:scale-[0.98] transition-all">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className="p-2.5 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-100 dark:border-slate-600">
+                                    <PlatformIcon platform={task.platform} size={22} />
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-sm text-slate-800 dark:text-slate-100 line-clamp-1">{task.title}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{task.type}</p>
+                                  </div>
                                 </div>
-                                <div>
-                                  <p className="font-bold text-sm text-slate-800 dark:text-slate-100 line-clamp-1">{task.title}</p>
-                                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{task.type}</p>
-                                </div>
+                                <button onClick={() => handleDoTask(task)} disabled={checkingTask === task.id} className="min-w-[70px] bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-bold py-2 px-3 rounded-xl text-sm hover:bg-indigo-100 flex justify-center items-center transition-colors">
+                                  {checkingTask === task.id ? <i className="fa-solid fa-spinner fa-spin text-indigo-500" style={{fontSize: '18px'}}></i> : `+${task.reward} ₽`}
+                                </button>
                               </div>
-                              <button onClick={() => handleDoTask(task)} disabled={checkingTask === task.id} className="min-w-[70px] bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-bold py-2 px-3 rounded-xl text-sm hover:bg-indigo-100 flex justify-center items-center transition-colors">
-                                {checkingTask === task.id ? <i className="fa-solid fa-spinner fa-spin text-indigo-500" style={{fontSize: '18px'}}></i> : `+${task.reward} ₽`}
-                              </button>
+                              <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 dark:text-slate-500 px-1">
+                                <span>Выполнено:</span>
+                                <span>{task.currentCount || 0} / {task.maxCount || '∞'}</span>
+                              </div>
                             </div>
                           ))
                         )}
@@ -556,10 +579,18 @@
                            </select>
                         </div>
                         <input type="text" placeholder="Ссылка (https://...)" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none dark:text-white transition-colors focus:border-purple-500" value={adminTaskForm.link} onChange={e => setAdminTaskForm({...adminTaskForm, link: e.target.value})} />
+                        
                         <div className="flex gap-2 items-center">
-                          <input type="number" step="0.1" placeholder="Награда (₽)" required className="w-2/3 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold dark:text-white transition-colors focus:border-purple-500" value={adminTaskForm.reward} onChange={e => setAdminTaskForm({...adminTaskForm, reward: e.target.value})} />
-                          <button type="submit" className="w-1/3 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition-colors shadow-md shadow-purple-500/30">Добавить</button>
+                          <div className="w-1/2">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase px-1">Награда (₽)</label>
+                            <input type="number" step="0.1" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold dark:text-white transition-colors focus:border-purple-500" value={adminTaskForm.reward} onChange={e => setAdminTaskForm({...adminTaskForm, reward: e.target.value})} />
+                          </div>
+                          <div className="w-1/2">
+                             <label className="text-[10px] font-bold text-slate-400 uppercase px-1">Лимит человек</label>
+                             <input type="number" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold dark:text-white transition-colors focus:border-purple-500" value={adminTaskForm.maxCount} onChange={e => setAdminTaskForm({...adminTaskForm, maxCount: e.target.value})} />
+                          </div>
                         </div>
+                        <button type="submit" className="w-full mt-2 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition-colors shadow-md shadow-purple-500/30">Закинуть в ленту</button>
                       </form>
 
                       {/* Изменение баланса */}
