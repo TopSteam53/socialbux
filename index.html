@@ -33,20 +33,30 @@
         const MAKE_WEBHOOK_URL = "https://hook.eu1.make.com/18jk32udu658rvw34jlynirj1chkslo9";
         const ADMIN_TG = "@makaroff_53"; 
         const BOT_USERNAME = "@SocialBux_bot"; 
-        
-        // === ТВОИ РЕКВИЗИТЫ ===
         const ADMIN_PHONE = "89524839430"; 
         const ADMIN_BANK = "Сбербанк"; 
 
-        // Иконки SVG
+        // Иконки
         const VkIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M13.162 18.994c.609 0 .858-.406.851-.915-.031-1.917.714-2.949 2.059-1.604 1.488 1.488 1.796 2.519 3.603 2.519h3.2c.808 0 1.126-.26 1.126-.668 0-.863-1.421-2.386-2.625-3.504-1.686-1.543-1.675-1.562 0-3.321C22.616 9.873 23.36 7.424 23.36 6.313c0-.422-.21-.63-.615-.63h-3.351c-.609 0-.858.406-1.144 1.096-1.686 3.666-3.87 6.136-4.664 6.136-.363 0-.585-.406-.585-1.146V6.313c0-.609-.153-.915-.656-.915h-4.32c-.416 0-.66.244-.66.52 0 .548.746.671.821 2.213v3.313c0 .813-.243.916-.604.916-1.282 0-3.791-2.909-5.187-5.836-.265-.548-.568-.863-1.282-.863H.77c-.503 0-.68.243-.68.52 0 .584.717 3.208 3.393 6.84 2.158 2.871 4.793 4.935 7.68 4.935z"/></svg>);
         const TiktokIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93v7.2c0 1.94-.8 3.8-2.26 5.15-1.46 1.34-3.4 2.1-5.4 2.1-2.01 0-3.95-.76-5.41-2.11C2.08 19.06 1.28 17.2 1.28 15.26c0-1.94.8-3.8 2.26-5.15 1.46-1.34 3.4-2.1 5.4-2.1h.67v4.03c-.23-.03-.45-.04-.67-.04-1.2 0-2.35.47-3.2 1.32-.85.85-1.33 2-1.33 3.2 0 1.2.48 2.35 1.33 3.2.85.85 2 1.33 3.2 1.33 1.2 0 2.35-.48 3.2-1.33.85-.85 1.33-2 1.33-3.2V.02z"/></svg>);
         const TelegramIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.223-.548.223l.188-2.85 5.18-4.686c.223-.204-.054-.31-.346-.116l-6.405 4.026-2.76-.86c-.6-.188-.614-.6.126-.89l10.785-4.158c.5-.184.956.12.88.541z"/></svg>);
 
         function App() {
           const [tgUser, setTgUser] = useState({ id: 987654321, first_name: 'Пользователь' });
-          const [balance, setBalance] = useState(0.00); 
           const [isAppLoading, setIsAppLoading] = useState(true);
+
+          // === ПАМЯТЬ ПРИЛОЖЕНИЯ (ЗАГРУЗКА) ===
+          const [balance, setBalance] = useState(() => parseFloat(localStorage.getItem('sb_balance') || '0.00'));
+          const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('sb_bonus_claimed'));
+          const [tasks, setTasks] = useState(() => JSON.parse(localStorage.getItem('sb_tasks') || '[]'));
+          const [myOrders, setMyOrders] = useState(() => JSON.parse(localStorage.getItem('sb_orders') || '[]'));
+          const [usedPromos, setUsedPromos] = useState(() => JSON.parse(localStorage.getItem('sb_promos') || '[]'));
+
+          // === ПАМЯТЬ ПРИЛОЖЕНИЯ (СОХРАНЕНИЕ) ===
+          useEffect(() => { localStorage.setItem('sb_balance', balance.toString()); }, [balance]);
+          useEffect(() => { localStorage.setItem('sb_tasks', JSON.stringify(tasks)); }, [tasks]);
+          useEffect(() => { localStorage.setItem('sb_orders', JSON.stringify(myOrders)); }, [myOrders]);
+          useEffect(() => { localStorage.setItem('sb_promos', JSON.stringify(usedPromos)); }, [usedPromos]);
 
           useEffect(() => {
             let userId = 987654321;
@@ -59,19 +69,16 @@
               }
             }
             
-            const fetchUserBalance = async () => {
-              try {
-                await fetch(MAKE_WEBHOOK_URL, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ action: 'getUser', telegramId: userId })
-                });
-                setTimeout(() => setIsAppLoading(false), 500);
-              } catch (e) {
-                setIsAppLoading(false);
-              }
-            };
-            fetchUserBalance();
+            // Фоновая отправка сигнала о входе
+            try {
+              fetch(MAKE_WEBHOOK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'login', telegramId: userId })
+              });
+            } catch (e) {}
+            
+            setTimeout(() => setIsAppLoading(false), 500);
           }, []);
 
           const [isDarkMode, setIsDarkMode] = useState(false);
@@ -82,11 +89,7 @@
           const [orderTab, setOrderTab] = useState('new');
           const [copied, setCopied] = useState(false);
           const [modal, setModal] = useState(null); 
-          const [showWelcome, setShowWelcome] = useState(true);
           const [promoCode, setPromoCode] = useState('');
-
-          const [tasks, setTasks] = useState([]);
-          const [myOrders, setMyOrders] = useState([]);
           const [orderForm, setOrderForm] = useState({ platform: 'telegram', action: 'subscribe', link: '', count: 100 });
           const [botIsAdmin, setBotIsAdmin] = useState(false); 
 
@@ -97,7 +100,6 @@
             tiktok: [{id: 'subscribe', label: 'Подписчики', price: 2.00}, {id: 'view', label: 'Просмотры', price: 0.20}, {id: 'like', label: 'Лайки', price: 0.50}],
           };
 
-          // Безопасное вычисление цены
           const currentActionObj = actionTypes[orderForm.platform]?.find(a => a.id === orderForm.action) || actionTypes[orderForm.platform][0];
           const currentPrice = currentActionObj ? currentActionObj.price : 0;
           const totalCost = (orderForm.count || 0) * currentPrice;
@@ -125,16 +127,25 @@
           };
 
           const claimWelcomeBonus = () => {
-            setBalance(30.00);
+            setBalance(prev => prev + 30.00);
             setShowWelcome(false);
+            localStorage.setItem('sb_bonus_claimed', 'true'); // Запоминаем, что бонус забран
             showNotif('Ура! 30 ₽ зачислены на баланс', 'success');
             sendToDatabase({ action: 'welcome_bonus', amount: 30 });
           };
 
           const handleApplyPromo = () => {
             if (!promoCode.trim()) return;
-            if (promoCode.toUpperCase() === 'TIKTOK50') {
+            const code = promoCode.toUpperCase();
+            
+            // Проверка, использовал ли уже этот код
+            if (usedPromos.includes(code)) {
+               return showNotif('Вы уже использовали этот код!', 'error');
+            }
+
+            if (code === 'TIKTOK50') {
               setBalance(prev => prev + 50);
+              setUsedPromos([...usedPromos, code]); // Запоминаем код
               showNotif('Промокод применен! +50 ₽', 'success');
               setPromoCode('');
               sendToDatabase({ action: 'promo_code', code: 'TIKTOK50', amount: 50 });
@@ -154,7 +165,6 @@
             }, 2000);
           };
 
-          // Ручная проверка данных перед заказом (Чтобы Айфон не тупил)
           const checkBotAdmin = (e) => {
             e.preventDefault();
             if (!orderForm.link || orderForm.link.trim() === '') {
@@ -503,7 +513,6 @@
 
                 {/* === МОДАЛКИ === */}
                 
-                {/* МОДАЛКА ПОПОЛНЕНИЯ (СБП) */}
                 {modal === 'deposit' && (
                   <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[150] flex items-end animate-in fade-in duration-200">
                      <div className="bg-white dark:bg-slate-800 w-full rounded-t-3xl p-6 animate-in slide-in-from-bottom-full duration-300">
