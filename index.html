@@ -1,0 +1,653 @@
+```html
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SocialBux</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+    <style>
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 16px); }
+        body { -webkit-tap-highlight-color: transparent; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // === ТВОИ НАСТРОЙКИ ===
+        const MAKE_WEBHOOK_URL = "https://hook.eu1.make.com/18jk32udu658rvw34jlynirj1chkslo9";
+        const ADMIN_TG = "@makaroff_53"; 
+        const BOT_USERNAME = "@SocialBux_bot"; 
+        
+        // === ТВОИ РЕКВИЗИТЫ ===
+        const ADMIN_PHONE = "89524839430"; 
+        const ADMIN_BANK = "Сбербанк"; 
+
+        // Иконки SVG
+        const VkIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M13.162 18.994c.609 0 .858-.406.851-.915-.031-1.917.714-2.949 2.059-1.604 1.488 1.488 1.796 2.519 3.603 2.519h3.2c.808 0 1.126-.26 1.126-.668 0-.863-1.421-2.386-2.625-3.504-1.686-1.543-1.675-1.562 0-3.321C22.616 9.873 23.36 7.424 23.36 6.313c0-.422-.21-.63-.615-.63h-3.351c-.609 0-.858.406-1.144 1.096-1.686 3.666-3.87 6.136-4.664 6.136-.363 0-.585-.406-.585-1.146V6.313c0-.609-.153-.915-.656-.915h-4.32c-.416 0-.66.244-.66.52 0 .548.746.671.821 2.213v3.313c0 .813-.243.916-.604.916-1.282 0-3.791-2.909-5.187-5.836-.265-.548-.568-.863-1.282-.863H.77c-.503 0-.68.243-.68.52 0 .584.717 3.208 3.393 6.84 2.158 2.871 4.793 4.935 7.68 4.935z"/></svg>);
+        const TiktokIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93v7.2c0 1.94-.8 3.8-2.26 5.15-1.46 1.34-3.4 2.1-5.4 2.1-2.01 0-3.95-.76-5.41-2.11C2.08 19.06 1.28 17.2 1.28 15.26c0-1.94.8-3.8 2.26-5.15 1.46-1.34 3.4-2.1 5.4-2.1h.67v4.03c-.23-.03-.45-.04-.67-.04-1.2 0-2.35.47-3.2 1.32-.85.85-1.33 2-1.33 3.2 0 1.2.48 2.35 1.33 3.2.85.85 2 1.33 3.2 1.33 1.2 0 2.35-.48 3.2-1.33.85-.85 1.33-2 1.33-3.2V.02z"/></svg>);
+        const TelegramIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.223-.548.223l.188-2.85 5.18-4.686c.223-.204-.054-.31-.346-.116l-6.405 4.026-2.76-.86c-.6-.188-.614-.6.126-.89l10.785-4.158c.5-.184.956.12.88.541z"/></svg>);
+
+        function App() {
+          const [tgUser, setTgUser] = useState({ id: 987654321, first_name: 'Пользователь' });
+          const [balance, setBalance] = useState(0.00); 
+          const [isAppLoading, setIsAppLoading] = useState(true);
+
+          useEffect(() => {
+            let userId = 987654321;
+            if (window.Telegram && window.Telegram.WebApp) {
+              const tg = window.Telegram.WebApp;
+              tg.expand();
+              if (tg.initDataUnsafe?.user) {
+                setTgUser(tg.initDataUnsafe.user);
+                userId = tg.initDataUnsafe.user.id;
+              }
+            }
+            
+            const fetchUserBalance = async () => {
+              try {
+                await fetch(MAKE_WEBHOOK_URL, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'getUser', telegramId: userId })
+                });
+                setTimeout(() => setIsAppLoading(false), 500);
+              } catch (e) {
+                setIsAppLoading(false);
+              }
+            };
+            fetchUserBalance();
+          }, []);
+
+          const [isDarkMode, setIsDarkMode] = useState(false);
+          const [activeTab, setActiveTab] = useState('earn'); 
+          const [notification, setNotification] = useState(null);
+          const [taskFilter, setTaskFilter] = useState('all');
+          const [checkingTask, setCheckingTask] = useState(null);
+          const [orderTab, setOrderTab] = useState('new');
+          const [copied, setCopied] = useState(false);
+          const [modal, setModal] = useState(null); 
+          const [showWelcome, setShowWelcome] = useState(true);
+          const [promoCode, setPromoCode] = useState('');
+
+          const [tasks, setTasks] = useState([]);
+          const [myOrders, setMyOrders] = useState([]);
+          const [orderForm, setOrderForm] = useState({ platform: 'telegram', action: 'subscribe', link: '', count: 100 });
+          const [botIsAdmin, setBotIsAdmin] = useState(false); 
+
+          const actionTypes = {
+            telegram: [{id: 'subscribe', label: 'Подписчики', price: 1.50}, {id: 'view', label: 'Просмотры', price: 0.10}, {id: 'reaction', label: 'Реакции', price: 0.20}],
+            vk: [{id: 'subscribe', label: 'Подписчики', price: 1.00}, {id: 'like', label: 'Лайки', price: 0.30}],
+            youtube: [{id: 'subscribe', label: 'Подписчики', price: 3.00}, {id: 'view', label: 'Просмотры', price: 0.50}, {id: 'like', label: 'Лайки', price: 1.00}],
+            tiktok: [{id: 'subscribe', label: 'Подписчики', price: 2.00}, {id: 'view', label: 'Просмотры', price: 0.20}, {id: 'like', label: 'Лайки', price: 0.50}],
+          };
+
+          // Безопасное вычисление цены
+          const currentActionObj = actionTypes[orderForm.platform]?.find(a => a.id === orderForm.action) || actionTypes[orderForm.platform][0];
+          const currentPrice = currentActionObj ? currentActionObj.price : 0;
+          const totalCost = (orderForm.count || 0) * currentPrice;
+
+          const handlePlatformChange = (p) => {
+            const firstAction = actionTypes[p][0].id;
+            setOrderForm({...orderForm, platform: p, action: firstAction});
+          };
+
+          const toggleTheme = () => setIsDarkMode(!isDarkMode);
+
+          const showNotif = (msg, type = 'success') => {
+            setNotification({ msg, type });
+            setTimeout(() => setNotification(null), 3000);
+          };
+
+          const sendToDatabase = async (payload) => {
+            try {
+              fetch(MAKE_WEBHOOK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...payload, telegramId: tgUser.id, userName: tgUser.first_name })
+              });
+            } catch (e) {}
+          };
+
+          const claimWelcomeBonus = () => {
+            setBalance(30.00);
+            setShowWelcome(false);
+            showNotif('Ура! 30 ₽ зачислены на баланс', 'success');
+            sendToDatabase({ action: 'welcome_bonus', amount: 30 });
+          };
+
+          const handleApplyPromo = () => {
+            if (!promoCode.trim()) return;
+            if (promoCode.toUpperCase() === 'TIKTOK50') {
+              setBalance(prev => prev + 50);
+              showNotif('Промокод применен! +50 ₽', 'success');
+              setPromoCode('');
+              sendToDatabase({ action: 'promo_code', code: 'TIKTOK50', amount: 50 });
+            } else {
+              showNotif('Неверный или просроченный промокод', 'error');
+            }
+          };
+
+          const handleDoTask = (task) => {
+            setCheckingTask(task.id);
+            setTimeout(() => {
+              setCheckingTask(null);
+              setBalance(prev => prev + task.reward);
+              setTasks(tasks.filter(t => t.id !== task.id));
+              showNotif(`Выполнено! +${task.reward} ₽`);
+              sendToDatabase({ action: 'task_completed', taskId: task.id, reward: task.reward });
+            }, 2000);
+          };
+
+          // Ручная проверка данных перед заказом (Чтобы Айфон не тупил)
+          const checkBotAdmin = (e) => {
+            e.preventDefault();
+            if (!orderForm.link || orderForm.link.trim() === '') {
+              return showNotif('Укажите ссылку на задание!', 'error');
+            }
+            if (!orderForm.link.startsWith('http')) {
+              return showNotif('Ссылка должна начинаться с http или https', 'error');
+            }
+            if (orderForm.count < 10) {
+              return showNotif('Минимальное количество — 10 шт.', 'error');
+            }
+
+            if (orderForm.platform === 'telegram' && orderForm.action === 'subscribe' && !botIsAdmin) {
+              setModal('adminWarning');
+              return;
+            }
+            executeOrder();
+          };
+
+          const executeOrder = () => {
+            if (balance < totalCost) return showNotif('Недостаточно средств!', 'error');
+            
+            const actionLabel = currentActionObj?.label || 'Накрутка';
+            setBalance(prev => prev - totalCost);
+            
+            setMyOrders([{ 
+              id: Date.now(), platform: orderForm.platform, type: actionLabel, count: orderForm.count, 
+              done: 0, status: 'active', link: orderForm.link, spent: totalCost 
+            }, ...myOrders]);
+            
+            const rewardPerTask = currentPrice * 0.5;
+            setTasks([{
+              id: Date.now(), platform: orderForm.platform, type: actionLabel,
+              reward: parseFloat(rewardPerTask.toFixed(2)),
+              title: orderForm.link.substring(0, 25) + '...', link: orderForm.link
+            }, ...tasks]);
+
+            showNotif(`Заказ на ${totalCost.toFixed(2)} ₽ успешно создан!`);
+            sendToDatabase({ action: 'create_order', platform: orderForm.platform, type: actionLabel, link: orderForm.link, count: orderForm.count, price: totalCost });
+            
+            setOrderForm({ ...orderForm, link: '', count: 100 });
+            setBotIsAdmin(false);
+            setModal(null);
+            setOrderTab('history');
+          };
+
+          const PlatformIcon = ({ platform, size = 20, className = "" }) => {
+            switch(platform) {
+              case 'telegram': return <TelegramIcon size={size} className={`text-[#2AABEE] ${className}`} />;
+              case 'youtube': return <i className={`fa-brands fa-youtube text-[#FF0000] ${className}`} style={{fontSize: `${size}px`}}></i>;
+              case 'vk': return <VkIcon size={size} className={`text-[#0077FF] ${className}`} />;
+              case 'tiktok': return <TiktokIcon size={size} className={`text-slate-900 dark:text-white ${className}`} />;
+              default: return <i className="fa-solid fa-circle-exclamation" style={{fontSize: `${size}px`}}></i>;
+            }
+          };
+
+          const ActionIcon = ({ action, size = 16 }) => {
+            switch(action) {
+              case 'subscribe': return <i className="fa-solid fa-user" style={{fontSize: `${size}px`}}></i>;
+              case 'view': return <i className="fa-solid fa-eye" style={{fontSize: `${size}px`}}></i>;
+              case 'like': return <i className="fa-solid fa-heart" style={{fontSize: `${size}px`}}></i>;
+              case 'reaction': return <i className="fa-solid fa-thumbs-up" style={{fontSize: `${size}px`}}></i>;
+              default: return <i className="fa-solid fa-circle-plus" style={{fontSize: `${size}px`}}></i>;
+            }
+          };
+
+          const getPlatformName = (platform) => {
+            switch(platform) {
+              case 'telegram': return 'Telegram';
+              case 'vk': return 'ВКонтакте';
+              case 'youtube': return 'YouTube';
+              case 'tiktok': return 'TikTok';
+              default: return 'Платформа';
+            }
+          };
+
+          if (isAppLoading) {
+            return (
+              <div className="flex flex-col items-center justify-center h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
+                <i className="fa-solid fa-circle-notch fa-spin text-indigo-500 mb-4" style={{fontSize: '48px'}}></i>
+                <p className="text-slate-500 font-medium">Синхронизация...</p>
+              </div>
+            );
+          }
+
+          return (
+            <div className={isDarkMode ? 'dark' : ''}>
+              <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans max-w-md mx-auto shadow-2xl relative overflow-hidden transition-colors duration-300">
+                
+                {showWelcome && (
+                  <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-800 w-full rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden">
+                      <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 relative z-10 shadow-lg shadow-indigo-500/30">
+                        <i className="fa-solid fa-gift text-white" style={{fontSize: '40px'}}></i>
+                        <i className="fa-solid fa-wand-magic-sparkles text-yellow-300 absolute -top-1 -right-1 animate-pulse" style={{fontSize: '24px'}}></i>
+                      </div>
+                      <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Привет, {tgUser.first_name}!</h2>
+                      <p className="text-slate-500 dark:text-slate-400 mb-6 font-medium text-sm">Мы дарим тебе стартовый бонус, чтобы ты сразу мог начать зарабатывать.</p>
+                      <div className="bg-slate-50 dark:bg-slate-900/50 border-2 border-dashed border-indigo-200 dark:border-indigo-500/30 rounded-2xl p-4 mb-6">
+                        <p className="text-sm text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider mb-1">Твой бонус</p>
+                        <p className="text-4xl font-black text-indigo-600 dark:text-indigo-400">30.00 ₽</p>
+                      </div>
+                      <button onClick={claimWelcomeBonus} className="w-full bg-indigo-600 text-white font-bold text-lg py-4 rounded-xl hover:bg-indigo-500 active:scale-95 transition-all shadow-lg shadow-indigo-500/30">
+                        Забрать бонус
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <header className="bg-white dark:bg-slate-800 px-5 py-4 flex justify-between items-center shadow-sm z-10 sticky top-0 transition-colors">
+                  <div className="font-extrabold text-xl text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
+                    <i className="fa-solid fa-circle-check" style={{fontSize: '24px'}}></i>
+                    SocialBux
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button onClick={toggleTheme} className="p-2 text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors bg-slate-50 dark:bg-slate-700 rounded-full">
+                      <i className={`fa-solid ${isDarkMode ? 'fa-sun' : 'fa-moon'}`} style={{fontSize: '18px'}}></i>
+                    </button>
+                    <div onClick={() => setModal('deposit')} className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-xl cursor-pointer hover:bg-indigo-100 border border-indigo-100 dark:border-indigo-800/50 transition-colors">
+                      <i className="fa-solid fa-wallet text-indigo-600 dark:text-indigo-400" style={{fontSize: '18px'}}></i>
+                      <span className="font-bold text-indigo-700 dark:text-indigo-300">{balance.toFixed(2)} ₽</span>
+                    </div>
+                  </div>
+                </header>
+
+                <main className="flex-1 overflow-y-auto p-4 pb-28">
+                  {activeTab === 'earn' && (
+                    <div className="animate-in fade-in duration-300 space-y-4">
+                      <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/30 rounded-2xl p-4 flex gap-3 items-start">
+                         <i className="fa-solid fa-circle-info text-indigo-500 dark:text-indigo-400 mt-0.5" style={{fontSize: '20px'}}></i>
+                         <div>
+                           <p className="font-bold text-indigo-900 dark:text-indigo-300 text-sm mb-1">Как тут заработать?</p>
+                           <p className="text-xs text-indigo-700 dark:text-indigo-200/70">Выбирай задание, выполняй его и получай деньги после проверки.</p>
+                         </div>
+                      </div>
+
+                      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+                        {['all', 'telegram', 'vk', 'youtube', 'tiktok'].map(filter => (
+                          <button key={filter} onClick={() => setTaskFilter(filter)} className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all ${taskFilter === filter ? 'bg-slate-800 dark:bg-indigo-500 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'}`}>
+                            {filter === 'all' ? 'Все' : filter.charAt(0).toUpperCase() + filter.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="space-y-3">
+                        {tasks.length === 0 ? (
+                          <div className="text-center py-12 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 border-dashed">
+                            <i className="fa-solid fa-wind mx-auto mb-3 opacity-20" style={{fontSize: '40px'}}></i>
+                            <p className="font-medium text-sm">Пока нет доступных заданий.</p>
+                            <p className="text-xs mt-1">Создайте заказ во вкладке "Заказать", и он появится здесь!</p>
+                          </div>
+                        ) : (
+                          (taskFilter === 'all' ? tasks : tasks.filter(t => t.platform === taskFilter)).map(task => (
+                            <div key={task.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between active:scale-[0.98] transition-all">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-100 dark:border-slate-600">
+                                  <PlatformIcon platform={task.platform} size={22} />
+                                </div>
+                                <div>
+                                  <p className="font-bold text-sm text-slate-800 dark:text-slate-100 line-clamp-1">{task.title}</p>
+                                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{task.type}</p>
+                                </div>
+                              </div>
+                              <button onClick={() => handleDoTask(task)} disabled={checkingTask === task.id} className="min-w-[70px] bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-bold py-2 px-3 rounded-xl text-sm hover:bg-indigo-100 flex justify-center items-center transition-colors">
+                                {checkingTask === task.id ? <i className="fa-solid fa-spinner fa-spin text-indigo-500" style={{fontSize: '18px'}}></i> : `+${task.reward} ₽`}
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* --- ЗАКАЗАТЬ --- */}
+                  {activeTab === 'order' && (
+                    <div className="animate-in fade-in duration-300 space-y-4">
+                      <div className="flex bg-slate-200/50 dark:bg-slate-800 p-1 rounded-xl mb-5">
+                        <button onClick={() => setOrderTab('new')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${orderTab === 'new' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Создать заказ</button>
+                        <button onClick={() => setOrderTab('history')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${orderTab === 'history' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Мои заказы</button>
+                      </div>
+                      
+                      {orderTab === 'new' ? (
+                        <form onSubmit={checkBotAdmin} noValidate className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-5">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Площадка</label>
+                            <div className="grid grid-cols-4 gap-2">
+                              {['telegram', 'vk', 'youtube', 'tiktok'].map(p => (
+                                <button key={p} type="button" onClick={() => handlePlatformChange(p)} className={`flex flex-col items-center justify-center p-2 rounded-xl border-2 transition-all ${orderForm.platform === p ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 shadow-sm' : 'border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
+                                  <PlatformIcon platform={p} size={28} />
+                                  <span className={`text-[10px] font-bold mt-1.5 ${orderForm.platform === p ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-500 dark:text-slate-400'}`}>{getPlatformName(p)}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Что крутим?</label>
+                            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1">
+                              {actionTypes[orderForm.platform].map(act => (
+                                <button key={act.id} type="button" onClick={() => setOrderForm({...orderForm, action: act.id})} className={`flex items-center gap-2.5 whitespace-nowrap px-4 py-2 rounded-xl border-2 transition-all ${orderForm.action === act.id ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 shadow-sm' : 'border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50'}`}>
+                                  <div className={`p-1.5 rounded-lg ${orderForm.action === act.id ? 'bg-indigo-100 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300' : 'bg-white dark:bg-slate-800 text-slate-400'}`}>
+                                    <ActionIcon action={act.id} />
+                                  </div>
+                                  <div className="flex flex-col items-start text-left">
+                                    <span className={`text-sm font-bold ${orderForm.action === act.id ? 'text-indigo-800 dark:text-indigo-200' : 'text-slate-600 dark:text-slate-300'}`}>{act.label}</span>
+                                    <span className={`text-[10px] font-medium ${orderForm.action === act.id ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>{act.price.toFixed(2)} ₽/шт</span>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Ссылка на объект</label>
+                            <input type="text" placeholder="https://t.me/..." className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:border-indigo-500 dark:focus:border-indigo-400 dark:text-white font-medium transition-colors" value={orderForm.link} onChange={e => setOrderForm({...orderForm, link: e.target.value})} />
+                            {orderForm.platform === 'telegram' && orderForm.action === 'subscribe' && (
+                              <div className="mt-2 bg-amber-50 dark:bg-amber-900/20 p-2.5 rounded-lg border border-amber-100 dark:border-amber-800/30 flex items-start gap-2">
+                                <i className="fa-solid fa-shield-halved mt-0.5 text-amber-600 dark:text-amber-500 flex-shrink-0" style={{fontSize: '14px'}}></i>
+                                <p className="text-[11px] text-amber-800 dark:text-amber-200 font-medium leading-tight">Для накрутки подписчиков добавьте <b>{BOT_USERNAME}</b> в администраторы канала.</p>
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Количество (Мин. 10)</label>
+                            <div className="relative">
+                              <input type="number" min="10" className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:border-indigo-500 dark:focus:border-indigo-400 dark:text-white font-bold text-lg transition-colors" value={orderForm.count || ''} onChange={e => setOrderForm({...orderForm, count: parseInt(e.target.value) || 0})} />
+                              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">шт.</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-slate-800 dark:bg-indigo-600 text-white p-4 rounded-xl flex justify-between items-center shadow-md">
+                            <div>
+                              <span className="text-slate-400 dark:text-indigo-200 text-xs block mb-0.5 font-medium">К списанию</span>
+                              <span className="font-black text-2xl">{totalCost.toFixed(2)} ₽</span>
+                            </div>
+                            <button type="submit" className="bg-indigo-500 dark:bg-white dark:text-indigo-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-indigo-400 dark:hover:bg-slate-100 active:scale-95 transition-all shadow-sm">Запустить</button>
+                          </div>
+                        </form>
+                      ) : (
+                         <div className="space-y-3">
+                          {myOrders.length === 0 ? (
+                            <div className="text-center py-12 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 border-dashed">
+                              <i className="fa-solid fa-clock-rotate-left mx-auto mb-3 opacity-20" style={{fontSize: '40px'}}></i>
+                              <p className="font-medium text-sm">У вас пока нет активных заказов</p>
+                            </div>
+                          ) : (
+                            myOrders.map(order => (
+                              <div key={order.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                                <div className="flex justify-between items-start mb-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-slate-50 dark:bg-slate-700 rounded-lg">
+                                      <PlatformIcon platform={order.platform} size={20} />
+                                    </div>
+                                    <div>
+                                      <span className="font-bold text-sm text-slate-800 dark:text-slate-100 block">{order.type}</span>
+                                      <span className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-[140px] block">{order.link}</span>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-md uppercase tracking-wider block mb-1">В работе</span>
+                                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{order.spent.toFixed(2)} ₽</span>
+                                  </div>
+                                </div>
+                                <div className="mb-1.5 flex justify-between text-xs font-bold text-slate-600 dark:text-slate-400">
+                                  <span>Прогресс</span>
+                                  <span>{order.done} / {order.count}</span>
+                                </div>
+                                <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                                  <div className="h-2.5 rounded-full bg-indigo-500 dark:bg-indigo-400" style={{width: `${(order.done / order.count) * 100}%`}}></div>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* --- ПРОФИЛЬ --- */}
+                  {activeTab === 'profile' && (
+                    <div className="animate-in fade-in duration-300 space-y-4">
+                      <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 text-center relative">
+                        <div className="w-20 h-20 bg-slate-100 dark:bg-slate-700 border-4 border-white dark:border-slate-800 shadow-sm rounded-full flex items-center justify-center mx-auto mb-3 relative z-10">
+                          <i className="fa-solid fa-user text-slate-400 dark:text-slate-500" style={{fontSize: '36px'}}></i>
+                        </div>
+                        <h2 className="text-xl font-bold text-slate-800 dark:text-white">{tgUser.first_name}</h2>
+                        <p className="text-slate-400 dark:text-slate-500 text-sm mb-5 font-medium">ID: {tgUser.id}</p>
+                        
+                        <div className="flex gap-3 justify-center">
+                          <button onClick={() => setModal('deposit')} className="flex-1 bg-slate-800 dark:bg-indigo-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-700 dark:hover:bg-indigo-500 transition-colors">
+                            <i className="fa-solid fa-arrow-down" style={{fontSize: '18px'}}></i> Пополнить
+                          </button>
+                          <button onClick={() => setModal('withdrawManual')} className="flex-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                            <i className="fa-solid fa-arrow-up" style={{fontSize: '18px'}}></i> Вывести
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700">
+                        <div className="flex items-center gap-2 mb-3">
+                          <i className="fa-solid fa-gift text-indigo-500 dark:text-indigo-400" style={{fontSize: '20px'}}></i>
+                          <h3 className="font-bold text-slate-800 dark:text-white">Активация промокода</h3>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Введи бонусный код здесь.</p>
+                        <div className="flex gap-2">
+                          <input type="text" placeholder="TIKTOK50" value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())} className="flex-1 px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold dark:text-white placeholder:font-normal uppercase focus:border-indigo-500 transition-colors" />
+                          <button onClick={handleApplyPromo} className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-bold px-5 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors">ОК</button>
+                        </div>
+                      </div>
+
+                      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
+                         <button onClick={() => setModal('support')} className="w-full flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                           <div className="flex items-center gap-3">
+                             <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
+                               <i className="fa-solid fa-circle-question text-blue-500 dark:text-blue-400" style={{fontSize: '20px'}}></i>
+                             </div>
+                             <div className="text-left">
+                               <p className="font-bold text-slate-800 dark:text-white">Поддержка и FAQ</p>
+                             </div>
+                           </div>
+                           <i className="fa-solid fa-chevron-right text-slate-400" style={{fontSize: '20px'}}></i>
+                         </button>
+
+                         <div className="p-5">
+                           <div className="flex items-center gap-3 mb-3">
+                             <div className="w-10 h-10 bg-purple-50 dark:bg-purple-900/20 rounded-full flex items-center justify-center">
+                               <i className="fa-solid fa-user text-purple-500 dark:text-purple-400" style={{fontSize: '20px'}}></i>
+                             </div>
+                             <div>
+                               <p className="font-bold text-slate-800 dark:text-white">Реферальная программа</p>
+                               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">10% от заработка друзей</p>
+                             </div>
+                           </div>
+                           <div className="flex items-center bg-slate-50 dark:bg-slate-900 p-1 pl-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                            <span className="text-sm font-medium text-slate-600 dark:text-slate-300 truncate flex-1">t.me/{BOT_USERNAME.replace('@','')}?start={tgUser.id}</span>
+                            <button onClick={() => {navigator.clipboard.writeText(`t.me/${BOT_USERNAME.replace('@','')}?start=${tgUser.id}`); setCopied(true); setTimeout(()=>setCopied(false), 2000)}} className="bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 p-2.5 rounded-lg ml-2 shadow-sm border border-slate-100 dark:border-slate-600 transition-colors">
+                              {copied ? <i className="fa-solid fa-check" style={{fontSize: '18px'}}></i> : <i className="fa-solid fa-copy" style={{fontSize: '18px'}}></i>}
+                            </button>
+                          </div>
+                         </div>
+                      </div>
+                    </div>
+                  )}
+                </main>
+
+                {/* === МОДАЛКИ === */}
+                
+                {/* МОДАЛКА ПОПОЛНЕНИЯ (СБП) */}
+                {modal === 'deposit' && (
+                  <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[150] flex items-end animate-in fade-in duration-200">
+                     <div className="bg-white dark:bg-slate-800 w-full rounded-t-3xl p-6 animate-in slide-in-from-bottom-full duration-300">
+                        <div className="flex justify-between items-center mb-6">
+                          <h3 className="font-bold text-xl text-slate-800 dark:text-white">Пополнение баланса</h3>
+                          <button onClick={() => setModal(null)} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-full text-slate-500 transition-colors"><i className="fa-solid fa-xmark" style={{fontSize: '20px'}}></i></button>
+                        </div>
+                        
+                        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 p-4 rounded-xl mb-5 text-center">
+                            <i className="fa-solid fa-triangle-exclamation text-amber-500 mb-2" style={{fontSize: '28px'}}></i>
+                            <p className="font-black text-amber-800 dark:text-amber-200 mb-1">ВАЖНО!</p>
+                            <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">Обязательно укажите ваш ID в комментарии к переводу, иначе мы не сможем зачислить средства на ваш аккаунт!</p>
+                        </div>
+
+                        <div className="space-y-3 mb-6">
+                           <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 p-4 rounded-xl flex flex-col gap-3">
+                              <div className="flex justify-between items-center">
+                                 <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">Номер (СБП):</span>
+                                 <span className="font-black text-sm text-slate-800 dark:text-white">{ADMIN_PHONE}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                 <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">Банк:</span>
+                                 <span className="font-black text-sm text-slate-800 dark:text-white">{ADMIN_BANK}</span>
+                              </div>
+                              <div className="flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/30 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-800 mt-1">
+                                 <span className="text-xs text-indigo-600 dark:text-indigo-400 font-bold">Комментарий:</span>
+                                 <div className="flex items-center gap-2">
+                                    <span className="font-black text-sm text-indigo-700 dark:text-indigo-300">{tgUser.id}</span>
+                                    <button onClick={() => {navigator.clipboard.writeText(tgUser.id); showNotif('ID скопирован!', 'success');}} className="text-indigo-500 active:scale-90 transition-transform bg-white dark:bg-slate-800 px-2 py-1 rounded shadow-sm border border-indigo-100 dark:border-indigo-700">
+                                      <i className="fa-solid fa-copy"></i>
+                                    </button>
+                                 </div>
+                              </div>
+                           </div>
+                        </div>
+
+                        <button onClick={() => { setModal(null); showNotif('Ожидайте зачисления. Обычно это занимает от 5 до 15 минут.'); }} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-colors shadow-md shadow-indigo-500/20">
+                          Я перевел деньги
+                        </button>
+                        <button onClick={() => { window.open(`https://t.me/${ADMIN_TG.replace('@', '')}`); }} className="w-full mt-2 text-slate-400 dark:text-slate-500 font-bold py-3 text-sm hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                          Проблема с пополнением?
+                        </button>
+                     </div>
+                  </div>
+                )}
+
+                {modal === 'withdrawManual' && (
+                  <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[200] flex items-end animate-in fade-in duration-200">
+                     <div className="bg-white dark:bg-slate-800 w-full rounded-t-3xl p-6 flex flex-col animate-in slide-in-from-bottom-full duration-300">
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="font-bold text-xl text-slate-800 dark:text-white flex items-center gap-2"><i className="fa-solid fa-wallet text-indigo-500" style={{fontSize: '24px'}}></i> Вывод средств</h3>
+                          <button onClick={() => setModal(null)} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-full text-slate-500 dark:text-slate-300 hover:bg-slate-200 transition-colors"><i className="fa-solid fa-xmark" style={{fontSize: '20px'}}></i></button>
+                        </div>
+                        <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 mb-5">
+                          <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                            Вывод заработанных средств производится <b>вручную</b>.<br/><br/>
+                            <span className="text-indigo-600 dark:text-indigo-400 font-bold">Минимальная сумма: 100 ₽.</span><br/><br/>
+                            Напишите администратору <b>{ADMIN_TG}</b> ваш ID (<b className="text-slate-800 dark:text-white">{tgUser.id}</b>) и номер карты.
+                          </p>
+                        </div>
+                        <button onClick={() => { setModal(null); window.open(`https://t.me/${ADMIN_TG.replace('@', '')}`); }} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-colors shadow-md shadow-indigo-500/20">
+                          <i className="fa-solid fa-message" style={{fontSize: '20px'}}></i> Написать администратору
+                        </button>
+                     </div>
+                  </div>
+                )}
+
+                {modal === 'support' && (
+                  <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[200] flex items-end animate-in fade-in duration-200">
+                     <div className="bg-white dark:bg-slate-800 w-full rounded-t-3xl p-6 h-[80vh] flex flex-col animate-in slide-in-from-bottom-full duration-300">
+                        <div className="flex justify-between items-center mb-6">
+                          <h3 className="font-bold text-xl text-slate-800 dark:text-white flex items-center gap-2">
+                            <i className="fa-solid fa-circle-question text-indigo-500" style={{fontSize: '24px'}}></i> Поддержка
+                          </h3>
+                          <button onClick={() => setModal(null)} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-full text-slate-500 dark:text-slate-300 transition-colors"><i className="fa-solid fa-xmark" style={{fontSize: '20px'}}></i></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+                          <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+                            <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-1">Как быстро приходят деньги?</h4>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">Деньги за задания зачисляются на баланс сразу после того, как наша система проверит выполнение (до 2 минут).</p>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+                            <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-1">Возникли проблемы?</h4>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">Если у вас не засчиталось задание или пропали деньги, свяжитесь напрямую с основателем проекта.</p>
+                          </div>
+                        </div>
+                        <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-700">
+                          <button onClick={() => { setModal(null); window.open(`https://t.me/${ADMIN_TG.replace('@', '')}`); }} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-colors shadow-md shadow-indigo-500/20">
+                            <i className="fa-solid fa-message" style={{fontSize: '20px'}}></i> Связаться с {ADMIN_TG}
+                          </button>
+                        </div>
+                     </div>
+                  </div>
+                )}
+
+                {modal === 'adminWarning' && (
+                  <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                     <div className="bg-white dark:bg-slate-800 w-full rounded-3xl p-6 shadow-2xl">
+                        <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <i className="fa-solid fa-shield-halved text-amber-600 dark:text-amber-500" style={{fontSize: '32px'}}></i>
+                        </div>
+                        <h3 className="font-bold text-xl mb-2 text-center text-slate-800 dark:text-white">Права администратора</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm mb-6 text-center">
+                          Чтобы бот мог проверять подписки, добавьте <b>{BOT_USERNAME}</b> в администраторы вашего канала. При проблемах пишите <b>{ADMIN_TG}</b>.
+                        </p>
+                        <div className="space-y-3">
+                          <button onClick={() => { setBotIsAdmin(true); executeOrder(); }} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-500 transition-colors">Я добавил бота</button>
+                          <button onClick={() => setModal(null)} className="w-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold py-3 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">Отмена</button>
+                        </div>
+                     </div>
+                  </div>
+                )}
+
+                {notification && (
+                  <div className={`absolute top-20 left-4 right-4 p-4 rounded-2xl shadow-xl flex items-center gap-3 z-[250] animate-in slide-in-from-top-4 text-white font-medium ${notification.type === 'error' ? 'bg-red-500' : 'bg-slate-800 dark:bg-slate-700'}`}>
+                    {notification.type === 'error' ? <i className="fa-solid fa-circle-exclamation" style={{fontSize: '20px'}}></i> : <i className="fa-solid fa-circle-check text-green-400" style={{fontSize: '20px'}}></i>}
+                    <p className="text-sm">{notification.msg}</p>
+                  </div>
+                )}
+
+                <nav className="absolute bottom-0 w-full bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-700 flex justify-around p-2 pb-safe z-10 transition-colors">
+                  <button onClick={() => setActiveTab('earn')} className={`flex flex-col items-center p-2 rounded-xl transition-all w-16 ${activeTab === 'earn' ? 'text-indigo-600 dark:text-indigo-400 scale-110' : 'text-slate-400 dark:text-slate-500'}`}>
+                    <i className="fa-solid fa-list-check" style={{fontSize: '24px'}}></i>
+                    <span className="text-[10px] mt-1 font-bold">Заработать</span>
+                  </button>
+                  <button onClick={() => setActiveTab('order')} className={`flex flex-col items-center p-2 rounded-xl transition-all w-16 ${activeTab === 'order' ? 'text-indigo-600 dark:text-indigo-400 scale-110' : 'text-slate-400 dark:text-slate-500'}`}>
+                    <i className="fa-solid fa-circle-plus" style={{fontSize: '24px'}}></i>
+                    <span className="text-[10px] mt-1 font-bold">Заказать</span>
+                  </button>
+                  <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center p-2 rounded-xl transition-all w-16 ${activeTab === 'profile' ? 'text-indigo-600 dark:text-indigo-400 scale-110' : 'text-slate-400 dark:text-slate-500'}`}>
+                    <i className="fa-solid fa-user" style={{fontSize: '24px'}}></i>
+                    <span className="text-[10px] mt-1 font-bold">Профиль</span>
+                  </button>
+                </nav>
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
+
+```
