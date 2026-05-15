@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SocialBux</title>
     
+    <!-- Подключаем стили и библиотеки -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -20,7 +21,7 @@
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         .pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 16px); }
-        body { -webkit-tap-highlight-color: transparent; }
+        body { -webkit-tap-highlight-color: transparent; outline: none; }
     </style>
 </head>
 <body>
@@ -35,8 +36,9 @@
         const BOT_USERNAME = "@SocialBux_bot"; 
         const ADMIN_PHONE = "89524839430"; 
         const ADMIN_BANK = "Сбербанк"; 
+        const MY_ADMIN_ID = 1014857955; // Твой ID для админки
 
-        // Иконки
+        // === КАСТОМНЫЕ ИКОНКИ (SVG) ===
         const VkIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M13.162 18.994c.609 0 .858-.406.851-.915-.031-1.917.714-2.949 2.059-1.604 1.488 1.488 1.796 2.519 3.603 2.519h3.2c.808 0 1.126-.26 1.126-.668 0-.863-1.421-2.386-2.625-3.504-1.686-1.543-1.675-1.562 0-3.321C22.616 9.873 23.36 7.424 23.36 6.313c0-.422-.21-.63-.615-.63h-3.351c-.609 0-.858.406-1.144 1.096-1.686 3.666-3.87 6.136-4.664 6.136-.363 0-.585-.406-.585-1.146V6.313c0-.609-.153-.915-.656-.915h-4.32c-.416 0-.66.244-.66.52 0 .548.746.671.821 2.213v3.313c0 .813-.243.916-.604.916-1.282 0-3.791-2.909-5.187-5.836-.265-.548-.568-.863-1.282-.863H.77c-.503 0-.68.243-.68.52 0 .584.717 3.208 3.393 6.84 2.158 2.871 4.793 4.935 7.68 4.935z"/></svg>);
         const TiktokIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93v7.2c0 1.94-.8 3.8-2.26 5.15-1.46 1.34-3.4 2.1-5.4 2.1-2.01 0-3.95-.76-5.41-2.11C2.08 19.06 1.28 17.2 1.28 15.26c0-1.94.8-3.8 2.26-5.15 1.46-1.34 3.4-2.1 5.4-2.1h.67v4.03c-.23-.03-.45-.04-.67-.04-1.2 0-2.35.47-3.2 1.32-.85.85-1.33 2-1.33 3.2 0 1.2.48 2.35 1.33 3.2.85.85 2 1.33 3.2 1.33 1.2 0 2.35-.48 3.2-1.33.85-.85 1.33-2 1.33-3.2V.02z"/></svg>);
         const TelegramIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.223-.548.223l.188-2.85 5.18-4.686c.223-.204-.054-.31-.346-.116l-6.405 4.026-2.76-.86c-.6-.188-.614-.6.126-.89l10.785-4.158c.5-.184.956.12.88.541z"/></svg>);
@@ -44,44 +46,62 @@
         function App() {
           const [tgUser, setTgUser] = useState({ id: 987654321, first_name: 'Пользователь' });
           const [isAppLoading, setIsAppLoading] = useState(true);
+          const [isAdmin, setIsAdmin] = useState(false);
 
-          // === ПАМЯТЬ ПРИЛОЖЕНИЯ (ЗАГРУЗКА) ===
+          // === ТЕМА (Вот эту строчку я забыл в прошлый раз) ===
+          const [isDarkMode, setIsDarkMode] = useState(false);
+          const toggleTheme = () => setIsDarkMode(!isDarkMode);
+
+          // === ПАМЯТЬ ПРИЛОЖЕНИЯ ===
           const [balance, setBalance] = useState(() => parseFloat(localStorage.getItem('sb_balance') || '0.00'));
-          const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('sb_bonus_claimed'));
+          
+          const [showWelcome, setShowWelcome] = useState(() => {
+             const alreadyClaimed = localStorage.getItem('sb_bonus_claimed');
+             const hasBalance = parseFloat(localStorage.getItem('sb_balance') || '0') > 0;
+             return !(alreadyClaimed === 'true' || hasBalance);
+          });
+
           const [tasks, setTasks] = useState(() => JSON.parse(localStorage.getItem('sb_tasks') || '[]'));
           const [myOrders, setMyOrders] = useState(() => JSON.parse(localStorage.getItem('sb_orders') || '[]'));
           const [usedPromos, setUsedPromos] = useState(() => JSON.parse(localStorage.getItem('sb_promos') || '[]'));
 
-          // === ПАМЯТЬ ПРИЛОЖЕНИЯ (СОХРАНЕНИЕ) ===
-          useEffect(() => { localStorage.setItem('sb_balance', balance.toString()); }, [balance]);
+          // Авто-сохранение в память
+          useEffect(() => { localStorage.setItem('sb_balance', balance.toFixed(2)); }, [balance]);
           useEffect(() => { localStorage.setItem('sb_tasks', JSON.stringify(tasks)); }, [tasks]);
           useEffect(() => { localStorage.setItem('sb_orders', JSON.stringify(myOrders)); }, [myOrders]);
           useEffect(() => { localStorage.setItem('sb_promos', JSON.stringify(usedPromos)); }, [usedPromos]);
 
+          // Инициализация Telegram и проверка рефералов
           useEffect(() => {
             let userId = 987654321;
+            let userName = 'Пользователь';
+            
             if (window.Telegram && window.Telegram.WebApp) {
               const tg = window.Telegram.WebApp;
               tg.expand();
               if (tg.initDataUnsafe?.user) {
                 setTgUser(tg.initDataUnsafe.user);
                 userId = tg.initDataUnsafe.user.id;
+                userName = tg.initDataUnsafe.user.first_name;
+                
+                if (userId === MY_ADMIN_ID) setIsAdmin(true);
+
+                const startParam = tg.initDataUnsafe.start_param;
+                const hasBeenReferred = localStorage.getItem('sb_referred');
+                
+                if (startParam && !hasBeenReferred && startParam !== userId.toString()) {
+                   localStorage.setItem('sb_referred', 'true');
+                   fetch(MAKE_WEBHOOK_URL, {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify({ action: 'new_referral', telegramId: userId, userName: userName, referrerId: startParam })
+                   }).catch(e => console.log(e));
+                }
               }
             }
-            
-            // Фоновая отправка сигнала о входе
-            try {
-              fetch(MAKE_WEBHOOK_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'login', telegramId: userId })
-              });
-            } catch (e) {}
-            
-            setTimeout(() => setIsAppLoading(false), 500);
+            setTimeout(() => setIsAppLoading(false), 300);
           }, []);
 
-          const [isDarkMode, setIsDarkMode] = useState(false);
           const [activeTab, setActiveTab] = useState('earn'); 
           const [notification, setNotification] = useState(null);
           const [taskFilter, setTaskFilter] = useState('all');
@@ -91,7 +111,10 @@
           const [modal, setModal] = useState(null); 
           const [promoCode, setPromoCode] = useState('');
           const [orderForm, setOrderForm] = useState({ platform: 'telegram', action: 'subscribe', link: '', count: 100 });
-          const [botIsAdmin, setBotIsAdmin] = useState(false); 
+          const [botIsAdminChecked, setBotIsAdminChecked] = useState(false); 
+
+          const [adminTaskForm, setAdminTaskForm] = useState({ platform: 'telegram', type: 'Подписка', link: '', reward: 1.5 });
+          const [adminBalanceForm, setAdminBalanceForm] = useState({ targetId: '', amount: 0 });
 
           const actionTypes = {
             telegram: [{id: 'subscribe', label: 'Подписчики', price: 1.50}, {id: 'view', label: 'Просмотры', price: 0.10}, {id: 'reaction', label: 'Реакции', price: 0.20}],
@@ -109,8 +132,6 @@
             setOrderForm({...orderForm, platform: p, action: firstAction});
           };
 
-          const toggleTheme = () => setIsDarkMode(!isDarkMode);
-
           const showNotif = (msg, type = 'success') => {
             setNotification({ msg, type });
             setTimeout(() => setNotification(null), 3000);
@@ -127,28 +148,24 @@
           };
 
           const claimWelcomeBonus = () => {
+            if (localStorage.getItem('sb_bonus_claimed') === 'true') return;
             setBalance(prev => prev + 30.00);
             setShowWelcome(false);
-            localStorage.setItem('sb_bonus_claimed', 'true'); // Запоминаем, что бонус забран
+            localStorage.setItem('sb_bonus_claimed', 'true');
             showNotif('Ура! 30 ₽ зачислены на баланс', 'success');
-            sendToDatabase({ action: 'welcome_bonus', amount: 30 });
+            sendToDatabase({ action: 'welcome_bonus', amount: 30, link: 'Бонус за регу' });
           };
 
           const handleApplyPromo = () => {
             if (!promoCode.trim()) return;
             const code = promoCode.toUpperCase();
-            
-            // Проверка, использовал ли уже этот код
-            if (usedPromos.includes(code)) {
-               return showNotif('Вы уже использовали этот код!', 'error');
-            }
-
+            if (usedPromos.includes(code)) return showNotif('Вы уже использовали этот код!', 'error');
             if (code === 'TIKTOK50') {
               setBalance(prev => prev + 50);
-              setUsedPromos([...usedPromos, code]); // Запоминаем код
+              setUsedPromos([...usedPromos, code]);
               showNotif('Промокод применен! +50 ₽', 'success');
               setPromoCode('');
-              sendToDatabase({ action: 'promo_code', code: 'TIKTOK50', amount: 50 });
+              sendToDatabase({ action: 'promo_code', amount: 50, link: code });
             } else {
               showNotif('Неверный или просроченный промокод', 'error');
             }
@@ -161,23 +178,15 @@
               setBalance(prev => prev + task.reward);
               setTasks(tasks.filter(t => t.id !== task.id));
               showNotif(`Выполнено! +${task.reward} ₽`);
-              sendToDatabase({ action: 'task_completed', taskId: task.id, reward: task.reward });
+              sendToDatabase({ action: 'task_completed', amount: task.reward, link: task.title });
             }, 2000);
           };
 
           const checkBotAdmin = (e) => {
             e.preventDefault();
-            if (!orderForm.link || orderForm.link.trim() === '') {
-              return showNotif('Укажите ссылку на задание!', 'error');
-            }
-            if (!orderForm.link.startsWith('http')) {
-              return showNotif('Ссылка должна начинаться с http или https', 'error');
-            }
-            if (orderForm.count < 10) {
-              return showNotif('Минимальное количество — 10 шт.', 'error');
-            }
-
-            if (orderForm.platform === 'telegram' && orderForm.action === 'subscribe' && !botIsAdmin) {
+            if (!orderForm.link || !orderForm.link.startsWith('http')) return showNotif('Укажите верную ссылку на объект!', 'error');
+            if (orderForm.count < 10) return showNotif('Минимальное количество — 10 шт.', 'error');
+            if (orderForm.platform === 'telegram' && orderForm.action === 'subscribe' && !botIsAdminChecked) {
               setModal('adminWarning');
               return;
             }
@@ -186,29 +195,35 @@
 
           const executeOrder = () => {
             if (balance < totalCost) return showNotif('Недостаточно средств!', 'error');
-            
             const actionLabel = currentActionObj?.label || 'Накрутка';
             setBalance(prev => prev - totalCost);
-            
-            setMyOrders([{ 
-              id: Date.now(), platform: orderForm.platform, type: actionLabel, count: orderForm.count, 
-              done: 0, status: 'active', link: orderForm.link, spent: totalCost 
-            }, ...myOrders]);
+            setMyOrders([{ id: Date.now(), platform: orderForm.platform, type: actionLabel, count: orderForm.count, done: 0, status: 'active', link: orderForm.link, spent: totalCost }, ...myOrders]);
             
             const rewardPerTask = currentPrice * 0.5;
-            setTasks([{
-              id: Date.now(), platform: orderForm.platform, type: actionLabel,
-              reward: parseFloat(rewardPerTask.toFixed(2)),
-              title: orderForm.link.substring(0, 25) + '...', link: orderForm.link
-            }, ...tasks]);
+            setTasks([{ id: Date.now(), platform: orderForm.platform, type: actionLabel, reward: parseFloat(rewardPerTask.toFixed(2)), title: orderForm.link.substring(0, 25) + '...', link: orderForm.link }, ...tasks]);
 
-            showNotif(`Заказ на ${totalCost.toFixed(2)} ₽ успешно создан!`);
-            sendToDatabase({ action: 'create_order', platform: orderForm.platform, type: actionLabel, link: orderForm.link, count: orderForm.count, price: totalCost });
-            
+            showNotif(`Заказ на ${totalCost.toFixed(2)} ₽ успешно создан!`, 'success');
+            sendToDatabase({ action: 'create_order', amount: -totalCost, link: orderForm.link });
             setOrderForm({ ...orderForm, link: '', count: 100 });
-            setBotIsAdmin(false);
-            setModal(null);
-            setOrderTab('history');
+            setBotIsAdminChecked(false); setModal(null); setOrderTab('history');
+          };
+
+          // === ФУНКЦИИ АДМИНА ===
+          const handleAdminAddTask = (e) => {
+             e.preventDefault();
+             if (!adminTaskForm.link.startsWith('http')) return showNotif('Укажи нормальную ссылку', 'error');
+             setTasks([{ id: Date.now(), platform: adminTaskForm.platform, type: adminTaskForm.type, reward: parseFloat(adminTaskForm.reward), title: adminTaskForm.link.substring(0, 25) + '...', link: adminTaskForm.link }, ...tasks]);
+             showNotif('Задание добавлено в ленту!', 'success');
+             sendToDatabase({ action: 'admin_add_task', link: adminTaskForm.link, amount: adminTaskForm.reward });
+             setAdminTaskForm({...adminTaskForm, link: ''});
+          };
+
+          const handleAdminChangeBalance = (e) => {
+             e.preventDefault();
+             if (!adminBalanceForm.targetId) return showNotif('Укажи ID', 'error');
+             sendToDatabase({ action: 'admin_change_balance', telegramId: adminBalanceForm.targetId, amount: adminBalanceForm.amount, link: 'Ручное пополнение' });
+             showNotif(`Лог пополнения отправлен в таблицу!`, 'success');
+             setAdminBalanceForm({ targetId: '', amount: 0 });
           };
 
           const PlatformIcon = ({ platform, size = 20, className = "" }) => {
@@ -243,9 +258,9 @@
 
           if (isAppLoading) {
             return (
-              <div className="flex flex-col items-center justify-center h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
+              <div className="flex flex-col items-center justify-center h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
                 <i className="fa-solid fa-circle-notch fa-spin text-indigo-500 mb-4" style={{fontSize: '48px'}}></i>
-                <p className="text-slate-500 font-medium">Синхронизация...</p>
+                <p className="text-slate-500 dark:text-slate-400 font-medium animate-pulse">Синхронизация профиля...</p>
               </div>
             );
           }
@@ -254,9 +269,10 @@
             <div className={isDarkMode ? 'dark' : ''}>
               <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans max-w-md mx-auto shadow-2xl relative overflow-hidden transition-colors duration-300">
                 
+                {/* === БОНУС === */}
                 {showWelcome && (
                   <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-800 w-full rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden">
+                    <div className="bg-white dark:bg-slate-800 w-full rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
                       <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 relative z-10 shadow-lg shadow-indigo-500/30">
                         <i className="fa-solid fa-gift text-white" style={{fontSize: '40px'}}></i>
                         <i className="fa-solid fa-wand-magic-sparkles text-yellow-300 absolute -top-1 -right-1 animate-pulse" style={{fontSize: '24px'}}></i>
@@ -274,6 +290,7 @@
                   </div>
                 )}
 
+                {/* === ШАПКА === */}
                 <header className="bg-white dark:bg-slate-800 px-5 py-4 flex justify-between items-center shadow-sm z-10 sticky top-0 transition-colors">
                   <div className="font-extrabold text-xl text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
                     <i className="fa-solid fa-circle-check" style={{fontSize: '24px'}}></i>
@@ -290,7 +307,10 @@
                   </div>
                 </header>
 
+                {/* === КОНТЕНТ === */}
                 <main className="flex-1 overflow-y-auto p-4 pb-28">
+                  
+                  {/* --- ЗАРАБОТАТЬ --- */}
                   {activeTab === 'earn' && (
                     <div className="animate-in fade-in duration-300 space-y-4">
                       <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/30 rounded-2xl p-4 flex gap-3 items-start">
@@ -347,7 +367,7 @@
                       </div>
                       
                       {orderTab === 'new' ? (
-                        <form onSubmit={checkBotAdmin} noValidate className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-5">
+                        <form onSubmit={checkBotAdmin} className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-5">
                           <div>
                             <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Площадка</label>
                             <div className="grid grid-cols-4 gap-2">
@@ -379,7 +399,7 @@
 
                           <div>
                             <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Ссылка на объект</label>
-                            <input type="text" placeholder="https://t.me/..." className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:border-indigo-500 dark:focus:border-indigo-400 dark:text-white font-medium transition-colors" value={orderForm.link} onChange={e => setOrderForm({...orderForm, link: e.target.value})} />
+                            <input type="text" placeholder="https://..." className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:border-indigo-500 dark:focus:border-indigo-400 dark:text-white font-medium transition-colors" value={orderForm.link} onChange={e => setOrderForm({...orderForm, link: e.target.value})} />
                             {orderForm.platform === 'telegram' && orderForm.action === 'subscribe' && (
                               <div className="mt-2 bg-amber-50 dark:bg-amber-900/20 p-2.5 rounded-lg border border-amber-100 dark:border-amber-800/30 flex items-start gap-2">
                                 <i className="fa-solid fa-shield-halved mt-0.5 text-amber-600 dark:text-amber-500 flex-shrink-0" style={{fontSize: '14px'}}></i>
@@ -501,7 +521,7 @@
                            </div>
                            <div className="flex items-center bg-slate-50 dark:bg-slate-900 p-1 pl-4 rounded-xl border border-slate-200 dark:border-slate-700">
                             <span className="text-sm font-medium text-slate-600 dark:text-slate-300 truncate flex-1">t.me/{BOT_USERNAME.replace('@','')}?start={tgUser.id}</span>
-                            <button onClick={() => {navigator.clipboard.writeText(`t.me/${BOT_USERNAME.replace('@','')}?start=${tgUser.id}`); setCopied(true); setTimeout(()=>setCopied(false), 2000)}} className="bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 p-2.5 rounded-lg ml-2 shadow-sm border border-slate-100 dark:border-slate-600 transition-colors">
+                            <button onClick={() => {navigator.clipboard.writeText(`https://t.me/${BOT_USERNAME.replace('@','')}?start=${tgUser.id}`); showNotif('Скопировано')}} className="bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 p-2.5 rounded-lg ml-2 shadow-sm border border-slate-100 dark:border-slate-600 transition-colors">
                               {copied ? <i className="fa-solid fa-check" style={{fontSize: '18px'}}></i> : <i className="fa-solid fa-copy" style={{fontSize: '18px'}}></i>}
                             </button>
                           </div>
@@ -509,117 +529,120 @@
                       </div>
                     </div>
                   )}
+
+                  {/* --- АДМИНКА (ТОЛЬКО ДЛЯ ТЕБЯ) --- */}
+                  {activeTab === 'admin' && isAdmin && (
+                    <div className="animate-in fade-in duration-300 space-y-4">
+                      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-3xl shadow-xl relative overflow-hidden">
+                        <i className="fa-solid fa-crown absolute -right-4 -top-4 opacity-10" style={{fontSize: '120px'}}></i>
+                        <h2 className="font-black text-2xl flex items-center gap-2 relative z-10"><i className="fa-solid fa-shield-halved"></i> Панель Админа</h2>
+                        <p className="text-sm text-purple-200 mt-1 relative z-10">Твой ID: {MY_ADMIN_ID}</p>
+                      </div>
+
+                      {/* Добавление задания */}
+                      <form onSubmit={handleAdminAddTask} className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-4">
+                        <h3 className="font-bold text-sm text-slate-800 dark:text-white uppercase tracking-wider">Добавить задание</h3>
+                        <div className="flex gap-2">
+                           <select className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 p-3 rounded-xl w-1/2 outline-none dark:text-white font-medium" value={adminTaskForm.platform} onChange={e => setAdminTaskForm({...adminTaskForm, platform: e.target.value})}>
+                              <option value="telegram">Telegram</option>
+                              <option value="vk">VK</option>
+                              <option value="youtube">YouTube</option>
+                              <option value="tiktok">TikTok</option>
+                           </select>
+                           <select className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 p-3 rounded-xl w-1/2 outline-none dark:text-white font-medium" value={adminTaskForm.type} onChange={e => setAdminTaskForm({...adminTaskForm, type: e.target.value})}>
+                              <option>Подписка</option>
+                              <option>Лайк</option>
+                              <option>Просмотр</option>
+                           </select>
+                        </div>
+                        <input type="text" placeholder="Ссылка (https://...)" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none dark:text-white transition-colors focus:border-purple-500" value={adminTaskForm.link} onChange={e => setAdminTaskForm({...adminTaskForm, link: e.target.value})} />
+                        <div className="flex gap-2 items-center">
+                          <input type="number" step="0.1" placeholder="Награда (₽)" required className="w-2/3 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold dark:text-white transition-colors focus:border-purple-500" value={adminTaskForm.reward} onChange={e => setAdminTaskForm({...adminTaskForm, reward: e.target.value})} />
+                          <button type="submit" className="w-1/3 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition-colors shadow-md shadow-purple-500/30">Добавить</button>
+                        </div>
+                      </form>
+
+                      {/* Изменение баланса */}
+                      <form onSubmit={handleAdminChangeBalance} className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-4">
+                        <h3 className="font-bold text-sm text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                           <i className="fa-solid fa-coins text-green-500"></i> Ручное пополнение
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Отправит лог пополнения в Гугл Таблицу</p>
+                        <input type="number" placeholder="ID юзера (из таблицы)" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-mono dark:text-white transition-colors focus:border-green-500" value={adminBalanceForm.targetId} onChange={e => setAdminBalanceForm({...adminBalanceForm, targetId: e.target.value})} />
+                        <div className="flex gap-2 items-center">
+                          <input type="number" placeholder="Сумма (₽)" required className="w-2/3 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold text-green-600 dark:text-green-400 transition-colors focus:border-green-500" value={adminBalanceForm.amount || ''} onChange={e => setAdminBalanceForm({...adminBalanceForm, amount: parseInt(e.target.value) || 0})} />
+                          <button type="submit" className="w-1/3 bg-green-500 hover:bg-green-400 text-white font-bold py-3 rounded-xl transition-colors shadow-md shadow-green-500/30">В логи</button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
                 </main>
 
-                {/* === МОДАЛКИ === */}
-                
+                {/* МОДАЛКИ */}
                 {modal === 'deposit' && (
                   <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[150] flex items-end animate-in fade-in duration-200">
-                     <div className="bg-white dark:bg-slate-800 w-full rounded-t-3xl p-6 animate-in slide-in-from-bottom-full duration-300">
+                     <div className="bg-white dark:bg-slate-800 w-full rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-full duration-300">
                         <div className="flex justify-between items-center mb-6">
-                          <h3 className="font-bold text-xl text-slate-800 dark:text-white">Пополнение баланса</h3>
+                          <h3 className="font-bold text-xl text-slate-800 dark:text-white">Пополнение СБП</h3>
                           <button onClick={() => setModal(null)} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-full text-slate-500 transition-colors"><i className="fa-solid fa-xmark" style={{fontSize: '20px'}}></i></button>
                         </div>
-                        
-                        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 p-4 rounded-xl mb-5 text-center">
+                        <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-xl mb-5 text-center border border-amber-200 dark:border-amber-800/50">
                             <i className="fa-solid fa-triangle-exclamation text-amber-500 mb-2" style={{fontSize: '28px'}}></i>
                             <p className="font-black text-amber-800 dark:text-amber-200 mb-1">ВАЖНО!</p>
                             <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">Обязательно укажите ваш ID в комментарии к переводу, иначе мы не сможем зачислить средства на ваш аккаунт!</p>
                         </div>
-
-                        <div className="space-y-3 mb-6">
-                           <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 p-4 rounded-xl flex flex-col gap-3">
-                              <div className="flex justify-between items-center">
-                                 <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">Номер (СБП):</span>
-                                 <span className="font-black text-sm text-slate-800 dark:text-white">{ADMIN_PHONE}</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                 <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">Банк:</span>
-                                 <span className="font-black text-sm text-slate-800 dark:text-white">{ADMIN_BANK}</span>
-                              </div>
-                              <div className="flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/30 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-800 mt-1">
-                                 <span className="text-xs text-indigo-600 dark:text-indigo-400 font-bold">Комментарий:</span>
-                                 <div className="flex items-center gap-2">
-                                    <span className="font-black text-sm text-indigo-700 dark:text-indigo-300">{tgUser.id}</span>
-                                    <button onClick={() => {navigator.clipboard.writeText(tgUser.id); showNotif('ID скопирован!', 'success');}} className="text-indigo-500 active:scale-90 transition-transform bg-white dark:bg-slate-800 px-2 py-1 rounded shadow-sm border border-indigo-100 dark:border-indigo-700">
-                                      <i className="fa-solid fa-copy"></i>
-                                    </button>
-                                 </div>
-                              </div>
+                        <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 p-4 rounded-xl mb-6 space-y-3">
+                           <div className="flex justify-between items-center">
+                               <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">Номер (СБП):</span>
+                               <span className="font-black text-sm text-slate-800 dark:text-white">{ADMIN_PHONE}</span>
+                           </div>
+                           <div className="flex justify-between items-center">
+                               <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">Банк:</span>
+                               <span className="font-black text-sm text-slate-800 dark:text-white">{ADMIN_BANK}</span>
+                           </div>
+                           <div className="flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/30 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-800 mt-1">
+                               <span className="text-xs text-indigo-600 dark:text-indigo-400 font-bold">Комментарий:</span>
+                               <div className="flex items-center gap-2">
+                                  <span className="font-black text-sm text-indigo-700 dark:text-indigo-300">{tgUser.id}</span>
+                                  <button onClick={() => {navigator.clipboard.writeText(tgUser.id); showNotif('ID скопирован!', 'success');}} className="text-indigo-500 active:scale-90 transition-transform bg-white dark:bg-slate-800 px-2 py-1 rounded shadow-sm border border-indigo-100 dark:border-indigo-700">
+                                    <i className="fa-solid fa-copy"></i>
+                                  </button>
+                               </div>
                            </div>
                         </div>
-
-                        <button onClick={() => { setModal(null); showNotif('Ожидайте зачисления. Обычно это занимает от 5 до 15 минут.'); }} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-colors shadow-md shadow-indigo-500/20">
-                          Я перевел деньги
-                        </button>
-                        <button onClick={() => { window.open(`https://t.me/${ADMIN_TG.replace('@', '')}`); }} className="w-full mt-2 text-slate-400 dark:text-slate-500 font-bold py-3 text-sm hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-                          Проблема с пополнением?
-                        </button>
+                        <button onClick={() => { setModal(null); showNotif('Ожидайте зачисления 5-15 мин'); }} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-500 transition-colors shadow-md shadow-indigo-500/20">Я перевел деньги</button>
                      </div>
                   </div>
                 )}
-
+                
                 {modal === 'withdrawManual' && (
-                  <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[200] flex items-end animate-in fade-in duration-200">
-                     <div className="bg-white dark:bg-slate-800 w-full rounded-t-3xl p-6 flex flex-col animate-in slide-in-from-bottom-full duration-300">
-                        <div className="flex justify-between items-center mb-4">
-                          <h3 className="font-bold text-xl text-slate-800 dark:text-white flex items-center gap-2"><i className="fa-solid fa-wallet text-indigo-500" style={{fontSize: '24px'}}></i> Вывод средств</h3>
-                          <button onClick={() => setModal(null)} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-full text-slate-500 dark:text-slate-300 hover:bg-slate-200 transition-colors"><i className="fa-solid fa-xmark" style={{fontSize: '20px'}}></i></button>
+                  <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[150] flex items-end animate-in fade-in duration-200">
+                     <div className="bg-white dark:bg-slate-800 w-full rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-full duration-300">
+                        <div className="flex justify-between items-center mb-6">
+                          <h3 className="font-bold text-xl text-slate-800 dark:text-white">Вывод средств</h3>
+                          <button onClick={() => setModal(null)} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-full text-slate-500 transition-colors"><i className="fa-solid fa-xmark" style={{fontSize: '20px'}}></i></button>
                         </div>
-                        <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 mb-5">
-                          <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                            Вывод заработанных средств производится <b>вручную</b>.<br/><br/>
-                            <span className="text-indigo-600 dark:text-indigo-400 font-bold">Минимальная сумма: 100 ₽.</span><br/><br/>
-                            Напишите администратору <b>{ADMIN_TG}</b> ваш ID (<b className="text-slate-800 dark:text-white">{tgUser.id}</b>) и номер карты.
-                          </p>
+                        <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 mb-5 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                            Мин. сумма: <span className="text-indigo-600 dark:text-indigo-400 font-bold">100 ₽</span>.<br/><br/>
+                            Напишите администратору <b>{ADMIN_TG}</b> ваш ID (<b className="text-slate-800 dark:text-white">{tgUser.id}</b>) и реквизиты.
                         </div>
                         <button onClick={() => { setModal(null); window.open(`https://t.me/${ADMIN_TG.replace('@', '')}`); }} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-colors shadow-md shadow-indigo-500/20">
-                          <i className="fa-solid fa-message" style={{fontSize: '20px'}}></i> Написать администратору
+                          <i className="fa-solid fa-message" style={{fontSize: '20px'}}></i> Написать админу
                         </button>
-                     </div>
-                  </div>
-                )}
-
-                {modal === 'support' && (
-                  <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[200] flex items-end animate-in fade-in duration-200">
-                     <div className="bg-white dark:bg-slate-800 w-full rounded-t-3xl p-6 h-[80vh] flex flex-col animate-in slide-in-from-bottom-full duration-300">
-                        <div className="flex justify-between items-center mb-6">
-                          <h3 className="font-bold text-xl text-slate-800 dark:text-white flex items-center gap-2">
-                            <i className="fa-solid fa-circle-question text-indigo-500" style={{fontSize: '24px'}}></i> Поддержка
-                          </h3>
-                          <button onClick={() => setModal(null)} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-full text-slate-500 dark:text-slate-300 transition-colors"><i className="fa-solid fa-xmark" style={{fontSize: '20px'}}></i></button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-                          <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
-                            <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-1">Как быстро приходят деньги?</h4>
-                            <p className="text-xs text-slate-600 dark:text-slate-400">Деньги за задания зачисляются на баланс сразу после того, как наша система проверит выполнение (до 2 минут).</p>
-                          </div>
-                          <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
-                            <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-1">Возникли проблемы?</h4>
-                            <p className="text-xs text-slate-600 dark:text-slate-400">Если у вас не засчиталось задание или пропали деньги, свяжитесь напрямую с основателем проекта.</p>
-                          </div>
-                        </div>
-                        <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-700">
-                          <button onClick={() => { setModal(null); window.open(`https://t.me/${ADMIN_TG.replace('@', '')}`); }} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-colors shadow-md shadow-indigo-500/20">
-                            <i className="fa-solid fa-message" style={{fontSize: '20px'}}></i> Связаться с {ADMIN_TG}
-                          </button>
-                        </div>
                      </div>
                   </div>
                 )}
 
                 {modal === 'adminWarning' && (
                   <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4 animate-in fade-in duration-200">
-                     <div className="bg-white dark:bg-slate-800 w-full rounded-3xl p-6 shadow-2xl">
+                     <div className="bg-white dark:bg-slate-800 w-full rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-300">
                         <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
                           <i className="fa-solid fa-shield-halved text-amber-600 dark:text-amber-500" style={{fontSize: '32px'}}></i>
                         </div>
                         <h3 className="font-bold text-xl mb-2 text-center text-slate-800 dark:text-white">Права администратора</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm mb-6 text-center">
-                          Чтобы бот мог проверять подписки, добавьте <b>{BOT_USERNAME}</b> в администраторы вашего канала. При проблемах пишите <b>{ADMIN_TG}</b>.
-                        </p>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm mb-6 text-center">Добавьте <b>{BOT_USERNAME}</b> в администраторы канала.</p>
                         <div className="space-y-3">
-                          <button onClick={() => { setBotIsAdmin(true); executeOrder(); }} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-500 transition-colors">Я добавил бота</button>
+                          <button onClick={() => { setBotIsAdminChecked(true); executeOrder(); }} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-500 transition-colors">Я добавил бота</button>
                           <button onClick={() => setModal(null)} className="w-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold py-3 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">Отмена</button>
                         </div>
                      </div>
@@ -627,12 +650,13 @@
                 )}
 
                 {notification && (
-                  <div className={`absolute top-20 left-4 right-4 p-4 rounded-2xl shadow-xl flex items-center gap-3 z-[250] animate-in slide-in-from-top-4 text-white font-medium ${notification.type === 'error' ? 'bg-red-500' : 'bg-slate-800 dark:bg-slate-700'}`}>
+                  <div className={`absolute top-20 left-4 right-4 p-4 rounded-2xl shadow-xl flex items-center gap-3 z-[250] text-white font-medium animate-in slide-in-from-top-4 ${notification.type === 'error' ? 'bg-red-500' : 'bg-slate-800 dark:bg-slate-700'}`}>
                     {notification.type === 'error' ? <i className="fa-solid fa-circle-exclamation" style={{fontSize: '20px'}}></i> : <i className="fa-solid fa-circle-check text-green-400" style={{fontSize: '20px'}}></i>}
                     <p className="text-sm">{notification.msg}</p>
                   </div>
                 )}
 
+                {/* === НИЖНЯЯ ПАНЕЛЬ === */}
                 <nav className="absolute bottom-0 w-full bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-700 flex justify-around p-2 pb-safe z-10 transition-colors">
                   <button onClick={() => setActiveTab('earn')} className={`flex flex-col items-center p-2 rounded-xl transition-all w-16 ${activeTab === 'earn' ? 'text-indigo-600 dark:text-indigo-400 scale-110' : 'text-slate-400 dark:text-slate-500'}`}>
                     <i className="fa-solid fa-list-check" style={{fontSize: '24px'}}></i>
@@ -646,6 +670,12 @@
                     <i className="fa-solid fa-user" style={{fontSize: '24px'}}></i>
                     <span className="text-[10px] mt-1 font-bold">Профиль</span>
                   </button>
+                  {isAdmin && (
+                    <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center p-2 rounded-xl transition-all w-16 ${activeTab === 'admin' ? 'text-purple-600 dark:text-purple-400 scale-110' : 'text-slate-400 dark:text-slate-500'}`}>
+                      <i className="fa-solid fa-crown" style={{fontSize: '24px'}}></i>
+                      <span className="text-[10px] mt-1 font-bold">Админ</span>
+                    </button>
+                  )}
                 </nav>
               </div>
             </div>
