@@ -28,9 +28,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, updateDoc, collection, onSnapshot, addDoc, increment, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, updateDoc, collection, onSnapshot, addDoc, increment, arrayUnion, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // ТВОИ КЛЮЧИ
         const firebaseConfig = {
             apiKey: "AIzaSyAo71G46ktPo30MtjCgmtuMh8fH6c_fjX0",
             authDomain: "socialbux.firebaseapp.com",
@@ -44,7 +43,7 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        window.FirebaseSDK = { auth, db, signInAnonymously, doc, setDoc, updateDoc, collection, onSnapshot, addDoc, increment, arrayUnion };
+        window.FirebaseSDK = { auth, db, signInAnonymously, doc, setDoc, getDoc, updateDoc, collection, onSnapshot, addDoc, increment, arrayUnion };
     </script>
 
     <!-- ЛОГИКА ПРИЛОЖЕНИЯ -->
@@ -85,6 +84,7 @@
 
                 let userId = '987654321';
                 let userName = 'Пользователь';
+                let startParam = null;
                 
                 if (window.Telegram && window.Telegram.WebApp) {
                     const tg = window.Telegram.WebApp;
@@ -95,6 +95,7 @@
                         userName = tg.initDataUnsafe.user.first_name;
                         if (userId === MY_ADMIN_ID.toString()) setIsAdmin(true);
                     }
+                    startParam = tg.initDataUnsafe?.start_param; // Кто пригласил?
                 }
 
                 try {
@@ -105,6 +106,10 @@
                         if (docSnap.exists()) {
                             setDbUser(docSnap.data());
                         } else {
+                            // СОЗДАНИЕ НОВОГО ЮЗЕРА (СОХРАНЯЕМ РЕФЕРАЛА)
+                            let refId = null;
+                            if (startParam && startParam !== userId) refId = startParam.toString();
+                            
                             setDoc(userRef, {
                                 balance: 0,
                                 bonusClaimed: false,
@@ -112,8 +117,17 @@
                                 completedTasks: [], 
                                 myOrders: [], 
                                 name: userName,
+                                referrerId: refId, // Запоминаем пригласителя!
                                 joinedAt: new Date().toISOString()
                             });
+
+                            if (refId) {
+                                fetch(MAKE_WEBHOOK_URL, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ action: 'Новый реферал', telegramId: userId, userName: userName, link: `Пригласил: ${refId}` })
+                                }).catch(e => console.log(e));
+                            }
                         }
                         setIsAppLoading(false); 
                     }, (err) => {
@@ -132,7 +146,7 @@
                     });
 
                 } catch (error) {
-                    showNotif('Ошибка! Включите Anonymous Auth в Firebase.', 'error');
+                    showNotif('Ошибка подключения.', 'error');
                     setIsAppLoading(false); 
                 }
             };
@@ -152,7 +166,11 @@
 
           const [activeTab, setActiveTab] = useState('earn'); 
           const [taskFilter, setTaskFilter] = useState('all');
-          const [checkingTask, setCheckingTask] = useState(null);
+          
+          // СОСТОЯНИЯ АНТИ-ЧИТА
+          const [pendingTask, setPendingTask] = useState(null); // Задание, на которое юзер перешел
+          const [checkingTask, setCheckingTask] = useState(null); // Задание в процессе "крутилки"
+
           const [orderTab, setOrderTab] = useState('new');
           const [copied, setCopied] = useState(false);
           const [modal, setModal] = useState(null); 
@@ -179,7 +197,6 @@
             setOrderForm({...orderForm, platform: p, action: firstAction});
           };
 
-          // ЧЕТКАЯ ОТПРАВКА В MAKE.COM ДЛЯ ТАБЛИЦЫ
           const sendToMake = async (payload) => {
             try {
               fetch(MAKE_WEBHOOK_URL, {
@@ -216,40 +233,57 @@
             }
           };
 
-          // === ТЕПЕРЬ ОТКРЫВАЕМ ССЫЛКУ И ЖДЕМ ===
-          const handleDoTask = async (task) => {
-            setCheckingTask(task.id);
-            
-            // ПЕРЕКИДЫВАЕМ ЮЗЕРА НА ССЫЛКУ ЗАДАНИЯ
+          // === АНТИ-ЧИТ: ШАГ 1 (ОТКРЫТЬ ССЫЛКУ) ===
+          const handleOpenLink = (task) => {
             if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
                 window.Telegram.WebApp.openLink(task.link);
             } else {
                 window.open(task.link, '_blank');
             }
+            setPendingTask(task.id); // Запоминаем, что он ушел выполнять
+          };
 
+          // === АНТИ-ЧИТ: ШАГ 2 (ПРОВЕРИТЬ И ВЫДАТЬ НАГРАДУ + РЕФЕРАЛКЕ) ===
+          const handleVerifyTask = async (task) => {
+            setCheckingTask(task.id);
             const { db, doc, updateDoc, increment, arrayUnion } = window.FirebaseSDK;
             
-            // ЖДЕМ 4 СЕКУНДЫ (ТИПА ПРОВЕРЯЕМ ПОДПИСКУ)
+            // Имитация серверной проверки (3.5 секунды)
             setTimeout(async () => {
               try {
                   const userRef = doc(db, "users", tgUser.id.toString());
                   const taskRef = doc(db, "tasks", task.id);
 
+                  // Даем награду исполнителю
                   await updateDoc(userRef, {
                       balance: increment(task.reward),
                       completedTasks: arrayUnion(task.id)
                   });
 
+                  // Увеличиваем счетчик у задания
                   await updateDoc(taskRef, { currentCount: increment(1) });
 
+                  // === АВТО-РЕФЕРАЛКА (10%) ===
+                  if (dbUser?.referrerId) {
+                      try {
+                          const refBonus = parseFloat((task.reward * 0.1).toFixed(2));
+                          if (refBonus > 0) {
+                              const refRef = doc(db, "users", dbUser.referrerId);
+                              await updateDoc(refRef, { balance: increment(refBonus) });
+                          }
+                      } catch (e) { console.error("Ref error", e); }
+                  }
+
                   setCheckingTask(null);
-                  showNotif(`Выполнено! +${task.reward} ₽`);
+                  setPendingTask(null);
+                  showNotif(`Задание выполнено! +${task.reward} ₽`);
                   sendToMake({ action: 'Выполнил задание', amount: task.reward, link: task.link });
               } catch (e) {
-                  showNotif('Ошибка! Задание уже недоступно', 'error');
+                  showNotif('Ошибка! Задание завершилось или удалено', 'error');
                   setCheckingTask(null);
+                  setPendingTask(null);
               }
-            }, 4000); // 4000 миллисекунд = 4 секунды ожидания
+            }, 3500); 
           };
 
           const executeOrder = async () => {
@@ -339,7 +373,6 @@
                  const targetRef = doc(db, "users", adminBalanceForm.targetId.toString());
                  await updateDoc(targetRef, { balance: increment(adminBalanceForm.amount) });
                  
-                 // Шлем лог с ID ТОГО ЧЕЛОВЕКА, кому пополнили
                  fetch(MAKE_WEBHOOK_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -399,7 +432,7 @@
                   </div>
                 )}
                 <i className="fa-solid fa-circle-notch fa-spin text-indigo-500 mb-4" style={{fontSize: '48px'}}></i>
-                <p className="text-slate-500 dark:text-slate-400 font-medium animate-pulse">Соединение с облаком...</p>
+                <p className="text-slate-500 dark:text-slate-400 font-medium animate-pulse">Синхронизация профиля...</p>
               </div>
             );
           }
@@ -474,20 +507,28 @@
                           </div>
                         ) : (
                           (taskFilter === 'all' ? availableTasks : availableTasks.filter(t => t.platform === taskFilter)).map(task => (
-                            <div key={task.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col gap-3 active:scale-[0.98] transition-all">
+                            <div key={task.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col gap-3 transition-all">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   <div className="p-2.5 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-100 dark:border-slate-600">
                                     <PlatformIcon platform={task.platform} size={22} />
                                   </div>
                                   <div>
-                                    <p className="font-bold text-sm text-slate-800 dark:text-slate-100 line-clamp-1">{task.title}</p>
+                                    <p className="font-bold text-sm text-slate-800 dark:text-slate-100 line-clamp-1 w-[130px]">{task.title}</p>
                                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{task.type}</p>
                                   </div>
                                 </div>
-                                <button onClick={() => handleDoTask(task)} disabled={checkingTask === task.id} className="min-w-[70px] bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-bold py-2 px-3 rounded-xl text-sm hover:bg-indigo-100 flex justify-center items-center transition-colors">
-                                  {checkingTask === task.id ? <i className="fa-solid fa-spinner fa-spin text-indigo-500" style={{fontSize: '18px'}}></i> : `+${task.reward} ₽`}
-                                </button>
+                                
+                                {/* ДВУХШАГОВАЯ КНОПКА (АНТИ-ЧИТ) */}
+                                {pendingTask === task.id ? (
+                                    <button onClick={() => handleVerifyTask(task)} disabled={checkingTask === task.id} className={`min-w-[90px] font-bold py-2 px-3 rounded-xl text-sm flex justify-center items-center transition-colors shadow-sm ${checkingTask === task.id ? 'bg-slate-100 text-slate-400' : 'bg-green-500 text-white hover:bg-green-600 active:scale-95'}`}>
+                                        {checkingTask === task.id ? <i className="fa-solid fa-spinner fa-spin text-slate-500" style={{fontSize: '18px'}}></i> : `Проверить`}
+                                    </button>
+                                ) : (
+                                    <button onClick={() => handleOpenLink(task)} className="min-w-[90px] bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-bold py-2 px-3 rounded-xl text-sm hover:bg-indigo-100 flex justify-center items-center transition-colors active:scale-95">
+                                        Перейти <span className="ml-1 text-xs opacity-70">+{task.reward}₽</span>
+                                    </button>
+                                )}
                               </div>
                               <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 dark:text-slate-500 px-1">
                                 <span>Выполнено юзерами:</span>
@@ -616,12 +657,12 @@
                   {activeTab === 'profile' && (
                     <div className="animate-in fade-in duration-300 space-y-4">
                       <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 text-center relative">
-                        {/* === АВАТАРКА ТЕЛЕГРАМА === */}
-                        <div className="w-20 h-20 bg-slate-100 dark:bg-slate-700 border-4 border-white dark:border-slate-800 shadow-sm rounded-full flex items-center justify-center mx-auto mb-3 relative z-10 overflow-hidden">
+                        {/* АВАТАРКА */}
+                        <div className="w-24 h-24 bg-slate-100 dark:bg-slate-700 border-4 border-white dark:border-slate-800 shadow-md rounded-full flex items-center justify-center mx-auto mb-3 relative z-10 overflow-hidden">
                           {tgUser.photo_url ? (
                               <img src={tgUser.photo_url} alt="Аватар" className="w-full h-full object-cover" />
                           ) : (
-                              <i className="fa-solid fa-user text-slate-400 dark:text-slate-500" style={{fontSize: '36px'}}></i>
+                              <i className="fa-solid fa-user text-slate-300 dark:text-slate-500" style={{fontSize: '40px'}}></i>
                           )}
                         </div>
 
@@ -666,11 +707,11 @@
                          <div className="p-5">
                            <div className="flex items-center gap-3 mb-3">
                              <div className="w-10 h-10 bg-purple-50 dark:bg-purple-900/20 rounded-full flex items-center justify-center">
-                               <i className="fa-solid fa-user text-purple-500 dark:text-purple-400" style={{fontSize: '20px'}}></i>
+                               <i className="fa-solid fa-users text-purple-500 dark:text-purple-400" style={{fontSize: '20px'}}></i>
                              </div>
                              <div>
                                <p className="font-bold text-slate-800 dark:text-white">Реферальная программа</p>
-                               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">10% от заработка друзей</p>
+                               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Вы получаете 10% от заработка</p>
                              </div>
                            </div>
                            <div className="flex items-center bg-slate-50 dark:bg-slate-900 p-1 pl-4 rounded-xl border border-slate-200 dark:border-slate-700">
@@ -690,10 +731,9 @@
                       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-3xl shadow-xl relative overflow-hidden">
                         <i className="fa-solid fa-crown absolute -right-4 -top-4 opacity-10" style={{fontSize: '120px'}}></i>
                         <h2 className="font-black text-2xl flex items-center gap-2 relative z-10"><i className="fa-solid fa-shield-halved"></i> Панель Админа</h2>
-                        <p className="text-sm text-purple-200 mt-1 relative z-10">Твой ID: {MY_ADMIN_ID} (ОБЛАКО)</p>
+                        <p className="text-sm text-purple-200 mt-1 relative z-10">Твой ID: {MY_ADMIN_ID}</p>
                       </div>
 
-                      {/* Добавление задания */}
                       <form onSubmit={handleAdminAddTask} className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-4">
                         <h3 className="font-bold text-sm text-slate-800 dark:text-white uppercase tracking-wider">Добавить задание всем</h3>
                         <div className="flex gap-2">
@@ -724,7 +764,6 @@
                         <button type="submit" className="w-full mt-2 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition-colors shadow-md shadow-purple-500/30">Закинуть в облако</button>
                       </form>
 
-                      {/* Изменение баланса */}
                       <form onSubmit={handleAdminChangeBalance} className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-4">
                         <h3 className="font-bold text-sm text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
                            <i className="fa-solid fa-coins text-green-500"></i> Ручное пополнение
