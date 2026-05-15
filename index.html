@@ -13,9 +13,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-    <script>
-        tailwind.config = { darkMode: 'class' }
-    </script>
+    <script>tailwind.config = { darkMode: 'class' }</script>
     <style>
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
@@ -26,16 +24,41 @@
 <body>
     <div id="root"></div>
 
+    <!-- 1. ПОДКЛЮЧАЕМ БАЗУ ДАННЫХ (FIREBASE) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, updateDoc, collection, onSnapshot, addDoc, increment, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ТВОИ КЛЮЧИ!
+        const firebaseConfig = {
+            apiKey: "AIzaSyAo71G46ktPo30MtjCgmtuMh8fH6c_fjX0",
+            authDomain: "socialbux.firebaseapp.com",
+            projectId: "socialbux",
+            storageBucket: "socialbux.firebasestorage.app",
+            messagingSenderId: "233807375536",
+            appId: "1:233807375536:web:60cb1f20a07be684f09f75"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Передаем функции в React
+        window.FirebaseSDK = { auth, db, signInAnonymously, doc, setDoc, updateDoc, collection, onSnapshot, addDoc, increment, arrayUnion };
+    </script>
+
+    <!-- 2. ЛОГИКА ПРИЛОЖЕНИЯ (REACT) -->
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // === ТВОИ НАСТРОЙКИ ===
+        // === НАСТРОЙКИ ===
         const MAKE_WEBHOOK_URL = "https://hook.eu1.make.com/18jk32udu658rvw34jlynirj1chkslo9";
         const ADMIN_TG = "@makaroff_53"; 
         const BOT_USERNAME = "@SocialBux_bot"; 
         const ADMIN_PHONE = "89524839430"; 
         const ADMIN_BANK = "Сбербанк"; 
-        const MY_ADMIN_ID = 1014857955;
+        const MY_ADMIN_ID = 1014857955; // Твой ID
 
         // === ИКОНКИ ===
         const VkIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M13.162 18.994c.609 0 .858-.406.851-.915-.031-1.917.714-2.949 2.059-1.604 1.488 1.488 1.796 2.519 3.603 2.519h3.2c.808 0 1.126-.26 1.126-.668 0-.863-1.421-2.386-2.625-3.504-1.686-1.543-1.675-1.562 0-3.321C22.616 9.873 23.36 7.424 23.36 6.313c0-.422-.21-.63-.615-.63h-3.351c-.609 0-.858.406-1.144 1.096-1.686 3.666-3.87 6.136-4.664 6.136-.363 0-.585-.406-.585-1.146V6.313c0-.609-.153-.915-.656-.915h-4.32c-.416 0-.66.244-.66.52 0 .548.746.671.821 2.213v3.313c0 .813-.243.916-.604.916-1.282 0-3.791-2.909-5.187-5.836-.265-.548-.568-.863-1.282-.863H.77c-.503 0-.68.243-.68.52 0 .584.717 3.208 3.393 6.84 2.158 2.871 4.793 4.935 7.68 4.935z"/></svg>);
@@ -43,60 +66,16 @@
         const TelegramIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.223-.548.223l.188-2.85 5.18-4.686c.223-.204-.054-.31-.346-.116l-6.405 4.026-2.76-.86c-.6-.188-.614-.6.126-.89l10.785-4.158c.5-.184.956.12.88.541z"/></svg>);
 
         function App() {
-          const [tgUser, setTgUser] = useState({ id: 987654321, first_name: 'Пользователь' });
+          const [tgUser, setTgUser] = useState({ id: '987654321', first_name: 'Пользователь' });
           const [isAppLoading, setIsAppLoading] = useState(true);
           const [isAdmin, setIsAdmin] = useState(false);
 
+          // === СОСТОЯНИЯ ИЗ БАЗЫ ДАННЫХ ===
+          const [dbUser, setDbUser] = useState(null); // Профиль юзера из базы
+          const [allTasks, setAllTasks] = useState([]); // Все задания из базы
+
+          // UI Состояния
           const [isDarkMode, setIsDarkMode] = useState(false);
-          const toggleTheme = () => setIsDarkMode(!isDarkMode);
-
-          const [balance, setBalance] = useState(() => parseFloat(localStorage.getItem('sb_balance') || '0.00'));
-          
-          const [showWelcome, setShowWelcome] = useState(() => {
-             const alreadyClaimed = localStorage.getItem('sb_bonus_claimed');
-             const hasBalance = parseFloat(localStorage.getItem('sb_balance') || '0') > 0;
-             return !(alreadyClaimed === 'true' || hasBalance);
-          });
-
-          const [tasks, setTasks] = useState(() => JSON.parse(localStorage.getItem('sb_tasks') || '[]'));
-          const [myOrders, setMyOrders] = useState(() => JSON.parse(localStorage.getItem('sb_orders') || '[]'));
-          const [usedPromos, setUsedPromos] = useState(() => JSON.parse(localStorage.getItem('sb_promos') || '[]'));
-
-          useEffect(() => { localStorage.setItem('sb_balance', balance.toFixed(2)); }, [balance]);
-          useEffect(() => { localStorage.setItem('sb_tasks', JSON.stringify(tasks)); }, [tasks]);
-          useEffect(() => { localStorage.setItem('sb_orders', JSON.stringify(myOrders)); }, [myOrders]);
-          useEffect(() => { localStorage.setItem('sb_promos', JSON.stringify(usedPromos)); }, [usedPromos]);
-
-          useEffect(() => {
-            let userId = 987654321;
-            let userName = 'Пользователь';
-            
-            if (window.Telegram && window.Telegram.WebApp) {
-              const tg = window.Telegram.WebApp;
-              tg.expand();
-              if (tg.initDataUnsafe?.user) {
-                setTgUser(tg.initDataUnsafe.user);
-                userId = tg.initDataUnsafe.user.id;
-                userName = tg.initDataUnsafe.user.first_name;
-                
-                if (userId === MY_ADMIN_ID) setIsAdmin(true);
-
-                const startParam = tg.initDataUnsafe.start_param;
-                const hasBeenReferred = localStorage.getItem('sb_referred');
-                
-                if (startParam && !hasBeenReferred && startParam !== userId.toString()) {
-                   localStorage.setItem('sb_referred', 'true');
-                   fetch(MAKE_WEBHOOK_URL, {
-                     method: 'POST',
-                     headers: { 'Content-Type': 'application/json' },
-                     body: JSON.stringify({ action: 'new_referral', telegramId: userId, userName: userName, referrerId: startParam })
-                   }).catch(e => console.log(e));
-                }
-              }
-            }
-            setTimeout(() => setIsAppLoading(false), 300);
-          }, []);
-
           const [activeTab, setActiveTab] = useState('earn'); 
           const [notification, setNotification] = useState(null);
           const [taskFilter, setTaskFilter] = useState('all');
@@ -105,13 +84,95 @@
           const [copied, setCopied] = useState(false);
           const [modal, setModal] = useState(null); 
           const [promoCode, setPromoCode] = useState('');
-          const [orderForm, setOrderForm] = useState({ platform: 'telegram', action: 'subscribe', link: '', count: 100 });
+          const [orderForm, setOrderForm] = useState({ platform: 'telegram', action: 'subscribe', link: '', count: 10 });
           const [botIsAdminChecked, setBotIsAdminChecked] = useState(false); 
 
-          // Добавлено поле maxCount в админку
           const [adminTaskForm, setAdminTaskForm] = useState({ platform: 'telegram', type: 'Подписка', link: '', reward: 1.5, maxCount: 10 });
           const [adminBalanceForm, setAdminBalanceForm] = useState({ targetId: '', amount: 0 });
 
+          // ИНИЦИАЛИЗАЦИЯ
+          useEffect(() => {
+            const initCloud = async () => {
+                if (!window.FirebaseSDK) return setTimeout(initCloud, 100);
+                const { auth, db, signInAnonymously, doc, setDoc, updateDoc, collection, onSnapshot, increment } = window.FirebaseSDK;
+
+                let userId = '987654321';
+                let userName = 'Пользователь';
+                
+                if (window.Telegram && window.Telegram.WebApp) {
+                    const tg = window.Telegram.WebApp;
+                    tg.expand();
+                    if (tg.initDataUnsafe?.user) {
+                        setTgUser(tg.initDataUnsafe.user);
+                        userId = tg.initDataUnsafe.user.id.toString();
+                        userName = tg.initDataUnsafe.user.first_name;
+                        if (userId === MY_ADMIN_ID.toString()) setIsAdmin(true);
+                    }
+                }
+
+                try {
+                    // 1. Анонимная авторизация в облаке
+                    await signInAnonymously(auth);
+
+                    // 2. Слушаем профиль пользователя в реальном времени
+                    const userRef = doc(db, "users", userId);
+                    onSnapshot(userRef, (docSnap) => {
+                        if (docSnap.exists()) {
+                            setDbUser(docSnap.data());
+                        } else {
+                            // Если юзер зашел впервые - создаем ему профиль
+                            setDoc(userRef, {
+                                balance: 0,
+                                bonusClaimed: false,
+                                usedPromos: [],
+                                completedTasks: [], // Задания, которые он уже сделал
+                                myOrders: [], // Заказы, которые он создал
+                                name: userName,
+                                joinedAt: new Date().toISOString()
+                            });
+                        }
+                        setIsAppLoading(false);
+                    });
+
+                    // 3. Слушаем все задания в реальном времени
+                    const tasksRef = collection(db, "tasks");
+                    onSnapshot(tasksRef, (querySnapshot) => {
+                        const tasksArray = [];
+                        querySnapshot.forEach((doc) => {
+                            tasksArray.push({ id: doc.id, ...doc.data() });
+                        });
+                        // Сортируем: сначала новые
+                        tasksArray.sort((a, b) => b.createdAt - a.createdAt);
+                        setAllTasks(tasksArray);
+                    });
+
+                } catch (error) {
+                    console.error("Firebase Error:", error);
+                    showNotif('Ошибка подключения к базе', 'error');
+                }
+            };
+            initCloud();
+          }, []);
+
+          // === ДАННЫЕ ДЛЯ UI ===
+          // Вычисляем баланс (если базы еще нет, пишем 0)
+          const balance = dbUser?.balance || 0;
+          
+          // Показываем бонус, только если в базе написано false
+          const showWelcome = dbUser ? !dbUser.bonusClaimed : false;
+
+          // Фильтруем задания: показываем только те, что юзер ЕЩЕ НЕ ДЕЛАЛ и где ЕСТЬ МЕСТА
+          const availableTasks = allTasks.filter(t => {
+              const alreadyDid = dbUser?.completedTasks?.includes(t.id);
+              const hasSpots = t.currentCount < t.maxCount;
+              return !alreadyDid && hasSpots;
+          });
+
+          // Заказы, которые создал этот юзер
+          const myOrders = dbUser?.myOrders || [];
+
+
+          // === ЦЕНЫ И ПРАЙСЫ ===
           const actionTypes = {
             telegram: [{id: 'subscribe', label: 'Подписчики', price: 1.50}, {id: 'view', label: 'Просмотры', price: 0.10}, {id: 'reaction', label: 'Реакции', price: 0.20}],
             vk: [{id: 'subscribe', label: 'Подписчики', price: 1.00}, {id: 'like', label: 'Лайки', price: 0.30}],
@@ -123,6 +184,10 @@
           const currentPrice = currentActionObj ? currentActionObj.price : 0;
           const totalCost = (orderForm.count || 0) * currentPrice;
 
+
+          // === УТИЛИТЫ ===
+          const toggleTheme = () => setIsDarkMode(!isDarkMode);
+
           const handlePlatformChange = (p) => {
             const firstAction = actionTypes[p][0].id;
             setOrderForm({...orderForm, platform: p, action: firstAction});
@@ -133,7 +198,7 @@
             setTimeout(() => setNotification(null), 3000);
           };
 
-          const sendToDatabase = async (payload) => {
+          const sendToMake = async (payload) => {
             try {
               fetch(MAKE_WEBHOOK_URL, {
                 method: 'POST',
@@ -143,49 +208,123 @@
             } catch (e) {}
           };
 
-          const claimWelcomeBonus = () => {
-            if (localStorage.getItem('sb_bonus_claimed') === 'true') return;
-            setBalance(prev => prev + 30.00);
-            setShowWelcome(false);
-            localStorage.setItem('sb_bonus_claimed', 'true');
+
+          // === ОСНОВНЫЕ ДЕЙСТВИЯ (ОБЛАКО) ===
+          
+          const claimWelcomeBonus = async () => {
+            if (dbUser?.bonusClaimed) return;
+            const { db, doc, updateDoc, increment } = window.FirebaseSDK;
+            const userRef = doc(db, "users", tgUser.id.toString());
+            
+            // Обновляем в облаке
+            await updateDoc(userRef, {
+                balance: increment(30.00),
+                bonusClaimed: true
+            });
+            
             showNotif('Ура! 30 ₽ зачислены на баланс', 'success');
-            sendToDatabase({ action: 'welcome_bonus', amount: 30, link: 'Бонус за регу' });
+            sendToMake({ action: 'welcome_bonus', amount: 30, link: 'Бонус за регу' });
           };
 
-          const handleApplyPromo = () => {
+          const handleApplyPromo = async () => {
             if (!promoCode.trim()) return;
             const code = promoCode.toUpperCase();
-            if (usedPromos.includes(code)) return showNotif('Вы уже использовали этот код!', 'error');
+            
+            if (dbUser?.usedPromos?.includes(code)) return showNotif('Вы уже использовали этот код!', 'error');
+            
             if (code === 'TIKTOK50') {
-              setBalance(prev => prev + 50);
-              setUsedPromos([...usedPromos, code]);
+              const { db, doc, updateDoc, increment, arrayUnion } = window.FirebaseSDK;
+              const userRef = doc(db, "users", tgUser.id.toString());
+              
+              await updateDoc(userRef, {
+                  balance: increment(50),
+                  usedPromos: arrayUnion(code)
+              });
+
               showNotif('Промокод применен! +50 ₽', 'success');
               setPromoCode('');
-              sendToDatabase({ action: 'promo_code', amount: 50, link: code });
+              sendToMake({ action: 'promo_code', amount: 50, link: code });
             } else {
               showNotif('Неверный или просроченный промокод', 'error');
             }
           };
 
-          const handleDoTask = (task) => {
+          const handleDoTask = async (task) => {
             setCheckingTask(task.id);
-            setTimeout(() => {
-              setCheckingTask(null);
-              setBalance(prev => prev + task.reward);
-              
-              // Обновляем количество выполнений
-              setTasks(prevTasks => {
-                  return prevTasks.map(t => {
-                      if (t.id === task.id) {
-                          return { ...t, currentCount: (t.currentCount || 0) + 1 };
-                      }
-                      return t;
-                  }).filter(t => (t.currentCount || 0) < (t.maxCount || 999999)); // Удаляем, если лимит исчерпан
-              });
+            const { db, doc, updateDoc, increment, arrayUnion } = window.FirebaseSDK;
+            
+            // Имитация проверки (2 секунды)
+            setTimeout(async () => {
+              try {
+                  const userRef = doc(db, "users", tgUser.id.toString());
+                  const taskRef = doc(db, "tasks", task.id);
 
-              showNotif(`Выполнено! +${task.reward} ₽`);
-              sendToDatabase({ action: 'task_completed', amount: task.reward, link: task.title });
+                  // 1. Даем деньги и записываем в выполненные
+                  await updateDoc(userRef, {
+                      balance: increment(task.reward),
+                      completedTasks: arrayUnion(task.id)
+                  });
+
+                  // 2. Увеличиваем счетчик у задания
+                  await updateDoc(taskRef, {
+                      currentCount: increment(1)
+                  });
+
+                  setCheckingTask(null);
+                  showNotif(`Выполнено! +${task.reward} ₽`);
+                  sendToMake({ action: 'task_completed', amount: task.reward, link: task.title });
+              } catch (e) {
+                  showNotif('Ошибка! Задание уже недоступно', 'error');
+                  setCheckingTask(null);
+              }
             }, 2000);
+          };
+
+          const executeOrder = async () => {
+            if (balance < totalCost) return showNotif('Недостаточно средств!', 'error');
+            const { db, doc, updateDoc, collection, addDoc, increment, arrayUnion } = window.FirebaseSDK;
+            
+            const actionLabel = currentActionObj?.label || 'Накрутка';
+            const rewardPerTask = parseFloat((currentPrice * 0.5).toFixed(2));
+
+            try {
+                // 1. Снимаем деньги и добавляем заказ в профиль юзера
+                const userRef = doc(db, "users", tgUser.id.toString());
+                await updateDoc(userRef, {
+                    balance: increment(-totalCost),
+                    myOrders: arrayUnion({
+                        id: Date.now().toString(),
+                        platform: orderForm.platform,
+                        type: actionLabel,
+                        count: orderForm.count,
+                        done: 0,
+                        link: orderForm.link,
+                        spent: totalCost
+                    })
+                });
+
+                // 2. Создаем ПУБЛИЧНОЕ задание в ленте для всех
+                await addDoc(collection(db, "tasks"), {
+                    platform: orderForm.platform,
+                    type: actionLabel,
+                    title: orderForm.link.substring(0, 25) + '...',
+                    link: orderForm.link,
+                    reward: rewardPerTask,
+                    maxCount: orderForm.count,
+                    currentCount: 0,
+                    creatorId: tgUser.id.toString(),
+                    createdAt: Date.now()
+                });
+
+                showNotif(`Заказ на ${totalCost.toFixed(2)} ₽ успешно создан!`, 'success');
+                sendToMake({ action: 'create_order', amount: -totalCost, link: orderForm.link });
+                setOrderForm({ ...orderForm, link: '', count: 10 });
+                setBotIsAdminChecked(false); 
+                setModal(null); 
+                setOrderTab('history');
+            } catch (e) {
+                showNotif('Ошибка создания заказа', 'error');
+            }
           };
 
           const checkBotAdmin = (e) => {
@@ -199,50 +338,51 @@
             executeOrder();
           };
 
-          const executeOrder = () => {
-            if (balance < totalCost) return showNotif('Недостаточно средств!', 'error');
-            const actionLabel = currentActionObj?.label || 'Накрутка';
-            setBalance(prev => prev - totalCost);
-            setMyOrders([{ id: Date.now(), platform: orderForm.platform, type: actionLabel, count: orderForm.count, done: 0, status: 'active', link: orderForm.link, spent: totalCost }, ...myOrders]);
-            
-            const rewardPerTask = currentPrice * 0.5;
-            setTasks([{ id: Date.now(), platform: orderForm.platform, type: actionLabel, reward: parseFloat(rewardPerTask.toFixed(2)), title: orderForm.link.substring(0, 25) + '...', link: orderForm.link, maxCount: orderForm.count, currentCount: 0 }, ...tasks]);
-
-            showNotif(`Заказ на ${totalCost.toFixed(2)} ₽ успешно создан!`, 'success');
-            sendToDatabase({ action: 'create_order', amount: -totalCost, link: orderForm.link });
-            setOrderForm({ ...orderForm, link: '', count: 100 });
-            setBotIsAdminChecked(false); setModal(null); setOrderTab('history');
-          };
-
           // === ФУНКЦИИ АДМИНА ===
-          const handleAdminAddTask = (e) => {
+          const handleAdminAddTask = async (e) => {
              e.preventDefault();
              if (!adminTaskForm.link.startsWith('http')) return showNotif('Укажи нормальную ссылку', 'error');
              
-             setTasks([{ 
-                 id: Date.now(), 
-                 platform: adminTaskForm.platform, 
-                 type: adminTaskForm.type, 
-                 reward: parseFloat(adminTaskForm.reward), 
-                 title: adminTaskForm.link.substring(0, 25) + '...', 
-                 link: adminTaskForm.link,
-                 maxCount: parseInt(adminTaskForm.maxCount) || 10,
-                 currentCount: 0
-             }, ...tasks]);
+             const { db, collection, addDoc } = window.FirebaseSDK;
              
-             showNotif('Задание добавлено в ленту!', 'success');
-             sendToDatabase({ action: 'admin_add_task', link: adminTaskForm.link, amount: adminTaskForm.reward });
+             await addDoc(collection(db, "tasks"), {
+                 platform: adminTaskForm.platform,
+                 type: adminTaskForm.type,
+                 title: adminTaskForm.link.substring(0, 25) + '...',
+                 link: adminTaskForm.link,
+                 reward: parseFloat(adminTaskForm.reward),
+                 maxCount: parseInt(adminTaskForm.maxCount) || 10,
+                 currentCount: 0,
+                 creatorId: "ADMIN",
+                 createdAt: Date.now()
+             });
+
+             showNotif('Задание отправлено в облако!', 'success');
+             sendToMake({ action: 'admin_add_task', link: adminTaskForm.link, amount: adminTaskForm.reward });
              setAdminTaskForm({...adminTaskForm, link: ''});
           };
 
-          const handleAdminChangeBalance = (e) => {
+          const handleAdminChangeBalance = async (e) => {
              e.preventDefault();
              if (!adminBalanceForm.targetId) return showNotif('Укажи ID', 'error');
-             sendToDatabase({ action: 'admin_change_balance', telegramId: adminBalanceForm.targetId, amount: adminBalanceForm.amount, link: 'Ручное пополнение' });
-             showNotif(`Лог пополнения отправлен в таблицу!`, 'success');
-             setAdminBalanceForm({ targetId: '', amount: 0 });
+             
+             const { db, doc, updateDoc, increment } = window.FirebaseSDK;
+             
+             try {
+                 const targetRef = doc(db, "users", adminBalanceForm.targetId.toString());
+                 await updateDoc(targetRef, {
+                     balance: increment(adminBalanceForm.amount)
+                 });
+                 
+                 sendToMake({ action: 'admin_change_balance', telegramId: adminBalanceForm.targetId, amount: adminBalanceForm.amount, link: 'Ручное пополнение' });
+                 showNotif(`Баланс юзера пополнен!`, 'success');
+                 setAdminBalanceForm({ targetId: '', amount: 0 });
+             } catch (err) {
+                 showNotif(`Ошибка! Юзера ${adminBalanceForm.targetId} нет в базе`, 'error');
+             }
           };
 
+          // === UI КОМПОНЕНТЫ ===
           const PlatformIcon = ({ platform, size = 20, className = "" }) => {
             switch(platform) {
               case 'telegram': return <TelegramIcon size={size} className={`text-[#2AABEE] ${className}`} />;
@@ -277,7 +417,7 @@
             return (
               <div className="flex flex-col items-center justify-center h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
                 <i className="fa-solid fa-circle-notch fa-spin text-indigo-500 mb-4" style={{fontSize: '48px'}}></i>
-                <p className="text-slate-500 dark:text-slate-400 font-medium animate-pulse">Синхронизация профиля...</p>
+                <p className="text-slate-500 dark:text-slate-400 font-medium animate-pulse">Соединение с облаком...</p>
               </div>
             );
           }
@@ -347,14 +487,14 @@
                       </div>
 
                       <div className="space-y-3">
-                        {tasks.length === 0 ? (
+                        {availableTasks.length === 0 ? (
                           <div className="text-center py-12 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 border-dashed">
                             <i className="fa-solid fa-wind mx-auto mb-3 opacity-20" style={{fontSize: '40px'}}></i>
-                            <p className="font-medium text-sm">Пока нет доступных заданий.</p>
-                            <p className="text-xs mt-1">Создайте заказ во вкладке "Заказать", и он появится здесь!</p>
+                            <p className="font-medium text-sm">Вы выполнили все задания!</p>
+                            <p className="text-xs mt-1">Возвращайтесь позже.</p>
                           </div>
                         ) : (
-                          (taskFilter === 'all' ? tasks : tasks.filter(t => t.platform === taskFilter)).map(task => (
+                          (taskFilter === 'all' ? availableTasks : availableTasks.filter(t => t.platform === taskFilter)).map(task => (
                             <div key={task.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col gap-3 active:scale-[0.98] transition-all">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -371,7 +511,7 @@
                                 </button>
                               </div>
                               <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 dark:text-slate-500 px-1">
-                                <span>Выполнено:</span>
+                                <span>Выполнено юзерами:</span>
                                 <span>{task.currentCount || 0} / {task.maxCount || '∞'}</span>
                               </div>
                             </div>
@@ -455,7 +595,12 @@
                               <p className="font-medium text-sm">У вас пока нет активных заказов</p>
                             </div>
                           ) : (
-                            myOrders.map(order => (
+                            myOrders.map(order => {
+                              // Находим этот заказ в общей базе, чтобы показать реальный прогресс
+                              const cloudTask = allTasks.find(t => t.link === order.link && t.type === order.type);
+                              const currentDone = cloudTask ? cloudTask.currentCount : order.done;
+                              
+                              return (
                               <div key={order.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                                 <div className="flex justify-between items-start mb-3">
                                   <div className="flex items-center gap-3">
@@ -468,19 +613,21 @@
                                     </div>
                                   </div>
                                   <div className="text-right">
-                                    <span className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-md uppercase tracking-wider block mb-1">В работе</span>
+                                    <span className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-md uppercase tracking-wider block mb-1">
+                                      {currentDone >= order.count ? 'Завершен' : 'В работе'}
+                                    </span>
                                     <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{order.spent.toFixed(2)} ₽</span>
                                   </div>
                                 </div>
                                 <div className="mb-1.5 flex justify-between text-xs font-bold text-slate-600 dark:text-slate-400">
                                   <span>Прогресс</span>
-                                  <span>{order.done} / {order.count}</span>
+                                  <span>{currentDone} / {order.count}</span>
                                 </div>
                                 <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
-                                  <div className="h-2.5 rounded-full bg-indigo-500 dark:bg-indigo-400" style={{width: `${(order.done / order.count) * 100}%`}}></div>
+                                  <div className="h-2.5 rounded-full bg-indigo-500 dark:bg-indigo-400" style={{width: `${(currentDone / order.count) * 100}%`}}></div>
                                 </div>
                               </div>
-                            ))
+                            )})
                           )}
                         </div>
                       )}
@@ -559,12 +706,12 @@
                       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-3xl shadow-xl relative overflow-hidden">
                         <i className="fa-solid fa-crown absolute -right-4 -top-4 opacity-10" style={{fontSize: '120px'}}></i>
                         <h2 className="font-black text-2xl flex items-center gap-2 relative z-10"><i className="fa-solid fa-shield-halved"></i> Панель Админа</h2>
-                        <p className="text-sm text-purple-200 mt-1 relative z-10">Твой ID: {MY_ADMIN_ID}</p>
+                        <p className="text-sm text-purple-200 mt-1 relative z-10">Твой ID: {MY_ADMIN_ID} (ОБЛАКО)</p>
                       </div>
 
                       {/* Добавление задания */}
                       <form onSubmit={handleAdminAddTask} className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-4">
-                        <h3 className="font-bold text-sm text-slate-800 dark:text-white uppercase tracking-wider">Добавить задание</h3>
+                        <h3 className="font-bold text-sm text-slate-800 dark:text-white uppercase tracking-wider">Добавить задание всем</h3>
                         <div className="flex gap-2">
                            <select className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 p-3 rounded-xl w-1/2 outline-none dark:text-white font-medium" value={adminTaskForm.platform} onChange={e => setAdminTaskForm({...adminTaskForm, platform: e.target.value})}>
                               <option value="telegram">Telegram</option>
@@ -582,15 +729,15 @@
                         
                         <div className="flex gap-2 items-center">
                           <div className="w-1/2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase px-1">Награда (₽)</label>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase px-1">Награда юзеру (₽)</label>
                             <input type="number" step="0.1" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold dark:text-white transition-colors focus:border-purple-500" value={adminTaskForm.reward} onChange={e => setAdminTaskForm({...adminTaskForm, reward: e.target.value})} />
                           </div>
                           <div className="w-1/2">
-                             <label className="text-[10px] font-bold text-slate-400 uppercase px-1">Лимит человек</label>
+                             <label className="text-[10px] font-bold text-slate-400 uppercase px-1">Сколько человек?</label>
                              <input type="number" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold dark:text-white transition-colors focus:border-purple-500" value={adminTaskForm.maxCount} onChange={e => setAdminTaskForm({...adminTaskForm, maxCount: e.target.value})} />
                           </div>
                         </div>
-                        <button type="submit" className="w-full mt-2 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition-colors shadow-md shadow-purple-500/30">Закинуть в ленту</button>
+                        <button type="submit" className="w-full mt-2 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition-colors shadow-md shadow-purple-500/30">Закинуть в облако</button>
                       </form>
 
                       {/* Изменение баланса */}
@@ -598,11 +745,11 @@
                         <h3 className="font-bold text-sm text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
                            <i className="fa-solid fa-coins text-green-500"></i> Ручное пополнение
                         </h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Отправит лог пополнения в Гугл Таблицу</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Мгновенно изменит баланс юзера в базе</p>
                         <input type="number" placeholder="ID юзера (из таблицы)" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-mono dark:text-white transition-colors focus:border-green-500" value={adminBalanceForm.targetId} onChange={e => setAdminBalanceForm({...adminBalanceForm, targetId: e.target.value})} />
                         <div className="flex gap-2 items-center">
                           <input type="number" placeholder="Сумма (₽)" required className="w-2/3 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold text-green-600 dark:text-green-400 transition-colors focus:border-green-500" value={adminBalanceForm.amount || ''} onChange={e => setAdminBalanceForm({...adminBalanceForm, amount: parseInt(e.target.value) || 0})} />
-                          <button type="submit" className="w-1/3 bg-green-500 hover:bg-green-400 text-white font-bold py-3 rounded-xl transition-colors shadow-md shadow-green-500/30">В логи</button>
+                          <button type="submit" className="w-1/3 bg-green-500 hover:bg-green-400 text-white font-bold py-3 rounded-xl transition-colors shadow-md shadow-green-500/30">Выдать</button>
                         </div>
                       </form>
                     </div>
