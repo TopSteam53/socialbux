@@ -24,11 +24,11 @@
 <body>
     <div id="root"></div>
 
-    <!-- ПОДКЛЮЧАЕМ БАЗУ ДАННЫХ (FIREBASE) -->
+    <!-- ПОДКЛЮЧАЕМ БАЗУ ДАННЫХ (FIREBASE) - ДОБАВЛЕН deleteDoc -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, updateDoc, collection, onSnapshot, addDoc, increment, arrayUnion, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, updateDoc, collection, onSnapshot, addDoc, increment, arrayUnion, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAo71G46ktPo30MtjCgmtuMh8fH6c_fjX0",
@@ -43,7 +43,7 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        window.FirebaseSDK = { auth, db, signInAnonymously, doc, setDoc, getDoc, updateDoc, collection, onSnapshot, addDoc, increment, arrayUnion };
+        window.FirebaseSDK = { auth, db, signInAnonymously, doc, setDoc, getDoc, updateDoc, collection, onSnapshot, addDoc, increment, arrayUnion, deleteDoc };
     </script>
 
     <!-- ЛОГИКА ПРИЛОЖЕНИЯ -->
@@ -95,7 +95,7 @@
                         userName = tg.initDataUnsafe.user.first_name;
                         if (userId === MY_ADMIN_ID.toString()) setIsAdmin(true);
                     }
-                    startParam = tg.initDataUnsafe?.start_param; // Кто пригласил?
+                    startParam = tg.initDataUnsafe?.start_param; 
                 }
 
                 try {
@@ -106,7 +106,6 @@
                         if (docSnap.exists()) {
                             setDbUser(docSnap.data());
                         } else {
-                            // СОЗДАНИЕ НОВОГО ЮЗЕРА (СОХРАНЯЕМ РЕФЕРАЛА)
                             let refId = null;
                             if (startParam && startParam !== userId) refId = startParam.toString();
                             
@@ -117,7 +116,7 @@
                                 completedTasks: [], 
                                 myOrders: [], 
                                 name: userName,
-                                referrerId: refId, // Запоминаем пригласителя!
+                                referrerId: refId, 
                                 joinedAt: new Date().toISOString()
                             });
 
@@ -167,9 +166,8 @@
           const [activeTab, setActiveTab] = useState('earn'); 
           const [taskFilter, setTaskFilter] = useState('all');
           
-          // СОСТОЯНИЯ АНТИ-ЧИТА
-          const [pendingTask, setPendingTask] = useState(null); // Задание, на которое юзер перешел
-          const [checkingTask, setCheckingTask] = useState(null); // Задание в процессе "крутилки"
+          const [pendingTask, setPendingTask] = useState(null); 
+          const [checkingTask, setCheckingTask] = useState(null); 
 
           const [orderTab, setOrderTab] = useState('new');
           const [copied, setCopied] = useState(false);
@@ -178,6 +176,8 @@
           const [orderForm, setOrderForm] = useState({ platform: 'telegram', action: 'subscribe', link: '', count: 10 });
           const [botIsAdminChecked, setBotIsAdminChecked] = useState(false); 
 
+          // === СОСТОЯНИЯ АДМИНКИ ===
+          const [adminTab, setAdminTab] = useState('add'); // Вкладки внутри админки: 'add', 'tasks', 'users'
           const [adminTaskForm, setAdminTaskForm] = useState({ platform: 'telegram', type: 'Подписка', link: '', reward: 1.5, maxCount: 10 });
           const [adminBalanceForm, setAdminBalanceForm] = useState({ targetId: '', amount: 0 });
 
@@ -233,37 +233,31 @@
             }
           };
 
-          // === АНТИ-ЧИТ: ШАГ 1 (ОТКРЫТЬ ССЫЛКУ) ===
           const handleOpenLink = (task) => {
             if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
                 window.Telegram.WebApp.openLink(task.link);
             } else {
                 window.open(task.link, '_blank');
             }
-            setPendingTask(task.id); // Запоминаем, что он ушел выполнять
+            setPendingTask(task.id); 
           };
 
-          // === АНТИ-ЧИТ: ШАГ 2 (ПРОВЕРИТЬ И ВЫДАТЬ НАГРАДУ + РЕФЕРАЛКЕ) ===
           const handleVerifyTask = async (task) => {
             setCheckingTask(task.id);
             const { db, doc, updateDoc, increment, arrayUnion } = window.FirebaseSDK;
             
-            // Имитация серверной проверки (3.5 секунды)
             setTimeout(async () => {
               try {
                   const userRef = doc(db, "users", tgUser.id.toString());
                   const taskRef = doc(db, "tasks", task.id);
 
-                  // Даем награду исполнителю
                   await updateDoc(userRef, {
                       balance: increment(task.reward),
                       completedTasks: arrayUnion(task.id)
                   });
 
-                  // Увеличиваем счетчик у задания
                   await updateDoc(taskRef, { currentCount: increment(1) });
 
-                  // === АВТО-РЕФЕРАЛКА (10%) ===
                   if (dbUser?.referrerId) {
                       try {
                           const refBonus = parseFloat((task.reward * 0.1).toFixed(2));
@@ -279,7 +273,7 @@
                   showNotif(`Задание выполнено! +${task.reward} ₽`);
                   sendToMake({ action: 'Выполнил задание', amount: task.reward, link: task.link });
               } catch (e) {
-                  showNotif('Ошибка! Задание завершилось или удалено', 'error');
+                  showNotif('Ошибка! Задание уже недоступно', 'error');
                   setCheckingTask(null);
                   setPendingTask(null);
               }
@@ -342,6 +336,7 @@
             executeOrder();
           };
 
+          // === ФУНКЦИИ АДМИНА ===
           const handleAdminAddTask = async (e) => {
              e.preventDefault();
              if (!adminTaskForm.link.startsWith('http')) return showNotif('Укажи нормальную ссылку', 'error');
@@ -392,6 +387,16 @@
              }
           };
 
+          const handleAdminDeleteTask = async (taskId) => {
+             const { db, doc, deleteDoc } = window.FirebaseSDK;
+             try {
+                 await deleteDoc(doc(db, "tasks", taskId));
+                 showNotif('Задание удалено из базы', 'success');
+             } catch(e) {
+                 showNotif('Ошибка удаления', 'error');
+             }
+          };
+
           const PlatformIcon = ({ platform, size = 20, className = "" }) => {
             switch(platform) {
               case 'telegram': return <TelegramIcon size={size} className={`text-[#2AABEE] ${className}`} />;
@@ -432,7 +437,7 @@
                   </div>
                 )}
                 <i className="fa-solid fa-circle-notch fa-spin text-indigo-500 mb-4" style={{fontSize: '48px'}}></i>
-                <p className="text-slate-500 dark:text-slate-400 font-medium animate-pulse">Синхронизация профиля...</p>
+                <p className="text-slate-500 dark:text-slate-400 font-medium animate-pulse">Соединение с облаком...</p>
               </div>
             );
           }
@@ -486,7 +491,7 @@
                          <i className="fa-solid fa-circle-info text-indigo-500 dark:text-indigo-400 mt-0.5" style={{fontSize: '20px'}}></i>
                          <div>
                            <p className="font-bold text-indigo-900 dark:text-indigo-300 text-sm mb-1">Как тут заработать?</p>
-                           <p className="text-xs text-indigo-700 dark:text-indigo-200/70">Выбирай задание, выполняй его и получай деньги после проверки.</p>
+                           <p className="text-xs text-indigo-700 dark:text-indigo-200/70">Нажми перейти, вернись и нажми проверить.</p>
                          </div>
                       </div>
 
@@ -519,7 +524,6 @@
                                   </div>
                                 </div>
                                 
-                                {/* ДВУХШАГОВАЯ КНОПКА (АНТИ-ЧИТ) */}
                                 {pendingTask === task.id ? (
                                     <button onClick={() => handleVerifyTask(task)} disabled={checkingTask === task.id} className={`min-w-[90px] font-bold py-2 px-3 rounded-xl text-sm flex justify-center items-center transition-colors shadow-sm ${checkingTask === task.id ? 'bg-slate-100 text-slate-400' : 'bg-green-500 text-white hover:bg-green-600 active:scale-95'}`}>
                                         {checkingTask === task.id ? <i className="fa-solid fa-spinner fa-spin text-slate-500" style={{fontSize: '18px'}}></i> : `Проверить`}
@@ -725,56 +729,96 @@
                     </div>
                   )}
 
-                  {/* --- АДМИНКА --- */}
+                  {/* --- АДМИНКА (ПЕРЕПИСАННАЯ) --- */}
                   {activeTab === 'admin' && isAdmin && (
                     <div className="animate-in fade-in duration-300 space-y-4">
                       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-3xl shadow-xl relative overflow-hidden">
                         <i className="fa-solid fa-crown absolute -right-4 -top-4 opacity-10" style={{fontSize: '120px'}}></i>
-                        <h2 className="font-black text-2xl flex items-center gap-2 relative z-10"><i className="fa-solid fa-shield-halved"></i> Панель Админа</h2>
-                        <p className="text-sm text-purple-200 mt-1 relative z-10">Твой ID: {MY_ADMIN_ID}</p>
+                        <h2 className="font-black text-2xl flex items-center gap-2 relative z-10"><i className="fa-solid fa-shield-halved"></i> Админка</h2>
+                        
+                        <div className="flex gap-4 mt-4 relative z-10">
+                            <div>
+                                <p className="text-[10px] text-purple-200 uppercase font-bold tracking-wider">Всего заданий</p>
+                                <p className="font-black text-2xl">{allTasks.length}</p>
+                            </div>
+                        </div>
                       </div>
 
-                      <form onSubmit={handleAdminAddTask} className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-4">
-                        <h3 className="font-bold text-sm text-slate-800 dark:text-white uppercase tracking-wider">Добавить задание всем</h3>
-                        <div className="flex gap-2">
-                           <select className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 p-3 rounded-xl w-1/2 outline-none dark:text-white font-medium" value={adminTaskForm.platform} onChange={e => setAdminTaskForm({...adminTaskForm, platform: e.target.value})}>
-                              <option value="telegram">Telegram</option>
-                              <option value="vk">VK</option>
-                              <option value="youtube">YouTube</option>
-                              <option value="tiktok">TikTok</option>
-                           </select>
-                           <select className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 p-3 rounded-xl w-1/2 outline-none dark:text-white font-medium" value={adminTaskForm.type} onChange={e => setAdminTaskForm({...adminTaskForm, type: e.target.value})}>
-                              <option>Подписка</option>
-                              <option>Лайк</option>
-                              <option>Просмотр</option>
-                           </select>
-                        </div>
-                        <input type="text" placeholder="Ссылка (https://...)" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none dark:text-white transition-colors focus:border-purple-500" value={adminTaskForm.link} onChange={e => setAdminTaskForm({...adminTaskForm, link: e.target.value})} />
-                        
-                        <div className="flex gap-2 items-center">
-                          <div className="w-1/2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase px-1">Награда юзеру (₽)</label>
-                            <input type="number" step="0.1" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold dark:text-white transition-colors focus:border-purple-500" value={adminTaskForm.reward} onChange={e => setAdminTaskForm({...adminTaskForm, reward: e.target.value})} />
-                          </div>
-                          <div className="w-1/2">
-                             <label className="text-[10px] font-bold text-slate-400 uppercase px-1">Сколько человек?</label>
-                             <input type="number" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold dark:text-white transition-colors focus:border-purple-500" value={adminTaskForm.maxCount} onChange={e => setAdminTaskForm({...adminTaskForm, maxCount: e.target.value})} />
-                          </div>
-                        </div>
-                        <button type="submit" className="w-full mt-2 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition-colors shadow-md shadow-purple-500/30">Закинуть в облако</button>
-                      </form>
+                      {/* НАВИГАЦИЯ АДМИНКИ */}
+                      <div className="flex bg-slate-200/50 dark:bg-slate-800 p-1 rounded-xl">
+                        <button onClick={() => setAdminTab('add')} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${adminTab === 'add' ? 'bg-white dark:bg-slate-700 shadow-sm text-purple-600 dark:text-purple-400' : 'text-slate-500 dark:text-slate-400'}`}>Создать</button>
+                        <button onClick={() => setAdminTab('tasks')} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${adminTab === 'tasks' ? 'bg-white dark:bg-slate-700 shadow-sm text-purple-600 dark:text-purple-400' : 'text-slate-500 dark:text-slate-400'}`}>База заданий</button>
+                        <button onClick={() => setAdminTab('users')} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${adminTab === 'users' ? 'bg-white dark:bg-slate-700 shadow-sm text-purple-600 dark:text-purple-400' : 'text-slate-500 dark:text-slate-400'}`}>Балансы</button>
+                      </div>
 
-                      <form onSubmit={handleAdminChangeBalance} className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-4">
-                        <h3 className="font-bold text-sm text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                           <i className="fa-solid fa-coins text-green-500"></i> Ручное пополнение
-                        </h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Мгновенно изменит баланс юзера в базе</p>
-                        <input type="number" placeholder="ID юзера (из таблицы)" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-mono dark:text-white transition-colors focus:border-green-500" value={adminBalanceForm.targetId} onChange={e => setAdminBalanceForm({...adminBalanceForm, targetId: e.target.value})} />
-                        <div className="flex gap-2 items-center">
-                          <input type="number" placeholder="Сумма (₽)" required className="w-2/3 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold text-green-600 dark:text-green-400 transition-colors focus:border-green-500" value={adminBalanceForm.amount || ''} onChange={e => setAdminBalanceForm({...adminBalanceForm, amount: parseInt(e.target.value) || 0})} />
-                          <button type="submit" className="w-1/3 bg-green-500 hover:bg-green-400 text-white font-bold py-3 rounded-xl transition-colors shadow-md shadow-green-500/30">Выдать</button>
-                        </div>
-                      </form>
+                      {/* ВКЛАДКА: СОЗДАТЬ ЗАДАНИЕ */}
+                      {adminTab === 'add' && (
+                          <form onSubmit={handleAdminAddTask} className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-4 animate-in fade-in">
+                            <h3 className="font-bold text-sm text-slate-800 dark:text-white uppercase tracking-wider">Новое задание</h3>
+                            <div className="flex gap-2">
+                               <select className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 p-3 rounded-xl w-1/2 outline-none dark:text-white font-medium" value={adminTaskForm.platform} onChange={e => setAdminTaskForm({...adminTaskForm, platform: e.target.value})}>
+                                  <option value="telegram">Telegram</option>
+                                  <option value="vk">VK</option>
+                                  <option value="youtube">YouTube</option>
+                                  <option value="tiktok">TikTok</option>
+                               </select>
+                               <select className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 p-3 rounded-xl w-1/2 outline-none dark:text-white font-medium" value={adminTaskForm.type} onChange={e => setAdminTaskForm({...adminTaskForm, type: e.target.value})}>
+                                  <option>Подписка</option>
+                                  <option>Лайк</option>
+                                  <option>Просмотр</option>
+                               </select>
+                            </div>
+                            <input type="text" placeholder="Ссылка (https://...)" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none dark:text-white transition-colors focus:border-purple-500" value={adminTaskForm.link} onChange={e => setAdminTaskForm({...adminTaskForm, link: e.target.value})} />
+                            
+                            <div className="flex gap-2 items-center">
+                              <div className="w-1/2">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase px-1">Награда (₽)</label>
+                                <input type="number" step="0.1" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold dark:text-white transition-colors focus:border-purple-500" value={adminTaskForm.reward} onChange={e => setAdminTaskForm({...adminTaskForm, reward: e.target.value})} />
+                              </div>
+                              <div className="w-1/2">
+                                 <label className="text-[10px] font-bold text-slate-400 uppercase px-1">Лимит (чел)</label>
+                                 <input type="number" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold dark:text-white transition-colors focus:border-purple-500" value={adminTaskForm.maxCount} onChange={e => setAdminTaskForm({...adminTaskForm, maxCount: e.target.value})} />
+                              </div>
+                            </div>
+                            <button type="submit" className="w-full mt-2 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition-colors shadow-md shadow-purple-500/30">Опубликовать</button>
+                          </form>
+                      )}
+
+                      {/* ВКЛАДКА: УПРАВЛЕНИЕ ЗАДАНИЯМИ */}
+                      {adminTab === 'tasks' && (
+                          <div className="space-y-3 animate-in fade-in">
+                            {allTasks.length === 0 ? <p className="text-center text-slate-500 text-sm py-4 border border-dashed border-slate-200 rounded-2xl">Нет заданий в базе</p> : allTasks.map(task => (
+                                <div key={task.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                                    <div className="w-[75%]">
+                                        <p className="font-bold text-sm text-slate-800 dark:text-white truncate">{task.title}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-[10px] font-bold bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded uppercase">{task.platform}</span>
+                                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{task.reward} ₽</span>
+                                            <span className="text-[10px] text-slate-400">({task.currentCount}/{task.maxCount} чел)</span>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => handleAdminDeleteTask(task.id)} className="w-10 h-10 bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl flex items-center justify-center transition-colors">
+                                        <i className="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
+                            ))}
+                          </div>
+                      )}
+
+                      {/* ВКЛАДКА: БАЛАНСЫ */}
+                      {adminTab === 'users' && (
+                          <form onSubmit={handleAdminChangeBalance} className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-4 animate-in fade-in">
+                            <h3 className="font-bold text-sm text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                               <i className="fa-solid fa-coins text-green-500"></i> Ручное пополнение
+                            </h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Мгновенно изменит баланс юзера в базе</p>
+                            <input type="number" placeholder="ID юзера (из таблицы)" required className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-mono dark:text-white transition-colors focus:border-green-500" value={adminBalanceForm.targetId} onChange={e => setAdminBalanceForm({...adminBalanceForm, targetId: e.target.value})} />
+                            <div className="flex gap-2 items-center">
+                              <input type="number" placeholder="Сумма (₽)" required className="w-2/3 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none font-bold text-green-600 dark:text-green-400 transition-colors focus:border-green-500" value={adminBalanceForm.amount || ''} onChange={e => setAdminBalanceForm({...adminBalanceForm, amount: parseInt(e.target.value) || 0})} />
+                              <button type="submit" className="w-1/3 bg-green-500 hover:bg-green-400 text-white font-bold py-3 rounded-xl transition-colors shadow-md shadow-green-500/30">Выдать</button>
+                            </div>
+                          </form>
+                      )}
                     </div>
                   )}
                 </main>
