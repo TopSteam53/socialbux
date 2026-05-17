@@ -50,12 +50,17 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
+        // === НАСТРОЙКИ ===
         const MAKE_WEBHOOK_URL = "https://hook.eu1.make.com/18jk32udu658rvw34jlynirj1chkslo9";
         const ADMIN_TG = "@makaroff_53"; 
         const BOT_USERNAME = "@SocialBux_bot"; 
         const ADMIN_PHONE = "89524839430"; 
         const ADMIN_BANK = "Сбербанк"; 
         const MY_ADMIN_ID = 1014857955; 
+        
+        // КАНАЛ ДЛЯ ПОДПИСКИ ЗА 30 РУБЛЕЙ
+        const SPONSOR_CHANNEL_LINK = "https://t.me/durov"; // Вставь сюда ссылку на свой ТГ канал
+        const SPONSOR_CHANNEL_NAME = "Официальный Канал";
 
         const VkIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M13.162 18.994c.609 0 .858-.406.851-.915-.031-1.917.714-2.949 2.059-1.604 1.488 1.488 1.796 2.519 3.603 2.519h3.2c.808 0 1.126-.26 1.126-.668 0-.863-1.421-2.386-2.625-3.504-1.686-1.543-1.675-1.562 0-3.321C22.616 9.873 23.36 7.424 23.36 6.313c0-.422-.21-.63-.615-.63h-3.351c-.609 0-.858.406-1.144 1.096-1.686 3.666-3.87 6.136-4.664 6.136-.363 0-.585-.406-.585-1.146V6.313c0-.609-.153-.915-.656-.915h-4.32c-.416 0-.66.244-.66.52 0 .548.746.671.821 2.213v3.313c0 .813-.243.916-.604.916-1.282 0-3.791-2.909-5.187-5.836-.265-.548-.568-.863-1.282-.863H.77c-.503 0-.68.243-.68.52 0 .584.717 3.208 3.393 6.84 2.158 2.871 4.793 4.935 7.68 4.935z"/></svg>);
         const TiktokIcon = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93v7.2c0 1.94-.8 3.8-2.26 5.15-1.46 1.34-3.4 2.1-5.4 2.1-2.01 0-3.95-.76-5.41-2.11C2.08 19.06 1.28 17.2 1.28 15.26c0-1.94.8-3.8 2.26-5.15 1.46-1.34 3.4-2.1 5.4-2.1h.67v4.03c-.23-.03-.45-.04-.67-.04-1.2 0-2.35.47-3.2 1.32-.85.85-1.33 2-1.33 3.2 0 1.2.48 2.35 1.33 3.2.85.85 2 1.33 3.2 1.33 1.2 0 2.35-.48 3.2-1.33.85-.85 1.33-2 1.33-3.2V.02z"/></svg>);
@@ -68,7 +73,6 @@
           const [dbUser, setDbUser] = useState(null); 
           const [allTasks, setAllTasks] = useState([]); 
           
-          // СОСТОЯНИЕ ДЛЯ СПИСКА ЮЗЕРОВ (АДМИНКА)
           const [allUsers, setAllUsers] = useState([]);
           const [searchUser, setSearchUser] = useState('');
 
@@ -80,6 +84,10 @@
             setNotification({ msg, type });
             setTimeout(() => setNotification(null), 4000);
           };
+
+          // СОСТОЯНИЯ ДЛЯ БОНУСА ЗА ПОДПИСКУ
+          const [sponsorClicked, setSponsorClicked] = useState(false);
+          const [isVerifyingWelcome, setIsVerifyingWelcome] = useState(false);
 
           useEffect(() => {
             const initCloud = async () => {
@@ -98,11 +106,8 @@
                         userId = tg.initDataUnsafe.user.id.toString();
                         userName = tg.initDataUnsafe.user.first_name;
                         
-                        // ПРОВЕРКА НА АДМИНА
                         if (userId === MY_ADMIN_ID.toString()) {
                             setIsAdmin(true);
-                            
-                            // АДМИНУ ГРУЗИМ ВСЕХ ЮЗЕРОВ
                             const usersRef = collection(db, "users");
                             onSnapshot(usersRef, (snap) => {
                                 const uArr = [];
@@ -129,6 +134,7 @@
                             setDoc(userRef, {
                                 balance: 0,
                                 bonusClaimed: false,
+                                storyShared: false, // Новое поле для х2 шансов
                                 usedPromos: [],
                                 completedTasks: [], 
                                 myOrders: [], 
@@ -193,7 +199,6 @@
           const [orderForm, setOrderForm] = useState({ platform: 'telegram', action: 'subscribe', link: '', count: 10 });
           const [botIsAdminChecked, setBotIsAdminChecked] = useState(false); 
 
-          // === СОСТОЯНИЯ АДМИНКИ ===
           const [adminTab, setAdminTab] = useState('add'); 
           const [adminTaskForm, setAdminTaskForm] = useState({ platform: 'telegram', type: 'Подписка', link: '', reward: 1.5, maxCount: 10 });
           const [adminBalanceForm, setAdminBalanceForm] = useState({ targetId: '', amount: 0 });
@@ -224,13 +229,32 @@
             } catch (e) {}
           };
 
-          const claimWelcomeBonus = async () => {
-            if (dbUser?.bonusClaimed) return;
-            const { db, doc, updateDoc, increment } = window.FirebaseSDK;
-            const userRef = doc(db, "users", tgUser.id.toString());
-            await updateDoc(userRef, { balance: increment(30.00), bonusClaimed: true });
-            showNotif('Ура! 30 ₽ зачислены на баланс', 'success');
-            sendToMake({ action: 'Получил бонус', amount: 30, link: 'Стартовый бонус' });
+          // === НОВЫЙ БОНУС (ОБЯЗАТЕЛЬНАЯ ПОДПИСКА) ===
+          const handleOpenSponsor = () => {
+              setSponsorClicked(true);
+              if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+                  window.Telegram.WebApp.openLink(SPONSOR_CHANNEL_LINK);
+              } else {
+                  window.open(SPONSOR_CHANNEL_LINK, '_blank');
+              }
+          };
+
+          const handleVerifyWelcome = () => {
+              if (!sponsorClicked) {
+                  return showNotif('Сначала нажми кнопку "Подписаться"!', 'error');
+              }
+              setIsVerifyingWelcome(true);
+              
+              // Имитация проверки (3 секунды)
+              setTimeout(async () => {
+                  const { db, doc, updateDoc, increment } = window.FirebaseSDK;
+                  const userRef = doc(db, "users", tgUser.id.toString());
+                  await updateDoc(userRef, { balance: increment(30.00), bonusClaimed: true });
+                  
+                  setIsVerifyingWelcome(false);
+                  showNotif('Ура! 30 ₽ зачислены на баланс', 'success');
+                  sendToMake({ action: 'Получил бонус за подписку', amount: 30, link: SPONSOR_CHANNEL_LINK });
+              }, 3000);
           };
 
           const handleApplyPromo = async () => {
@@ -353,7 +377,6 @@
             executeOrder();
           };
 
-          // === ФУНКЦИИ АДМИНА ===
           const handleAdminAddTask = async (e) => {
              e.preventDefault();
              if (!adminTaskForm.link.startsWith('http')) return showNotif('Укажи нормальную ссылку', 'error');
@@ -414,6 +437,35 @@
              }
           };
 
+          const copyReferralLink = () => {
+              navigator.clipboard.writeText(`https://t.me/${BOT_USERNAME.replace('@','')}?start=${tgUser.id}`);
+              setCopied(true);
+              showNotif('Твоя ссылка скопирована! Отправь её друзьям.', 'success');
+              setTimeout(() => setCopied(false), 2000);
+          };
+
+          // === ФУНКЦИЯ "ПОДЕЛИТЬСЯ В ИСТОРИЮ (x2 шансы)" ===
+          const shareToStory = async () => {
+              const shareText = encodeURIComponent("Тут платят реальные деньги за простые задания! Забирай 30₽ на старте 💸");
+              const shareUrl = encodeURIComponent(`https://t.me/${BOT_USERNAME.replace('@','')}?start=${tgUser.id}`);
+              const tmeLink = `https://t.me/share/url?url=${shareUrl}&text=${shareText}`;
+              
+              if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openTelegramLink) {
+                  window.Telegram.WebApp.openTelegramLink(tmeLink);
+              } else {
+                  window.open(tmeLink, '_blank');
+              }
+
+              // Записываем в базу, что он удвоил шансы
+              if (!dbUser.storyShared) {
+                  const { db, doc, updateDoc } = window.FirebaseSDK;
+                  try {
+                      await updateDoc(doc(db, "users", tgUser.id.toString()), { storyShared: true });
+                      showNotif("Умножение шансов x2 активировано!", "success");
+                  } catch(e){}
+              }
+          };
+
           const PlatformIcon = ({ platform, size = 20, className = "" }) => {
             switch(platform) {
               case 'telegram': return <TelegramIcon size={size} className={`text-[#2AABEE] ${className}`} />;
@@ -463,22 +515,25 @@
             <div className={isDarkMode ? 'dark' : ''}>
               <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans max-w-md mx-auto shadow-2xl relative overflow-hidden transition-colors duration-300">
                 
-                {/* === БОНУС === */}
+                {/* === БОНУС (С ЗАДАНИЕМ ПОДПИСКИ) === */}
                 {showWelcome && (
-                  <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                  <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-slate-800 w-full rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
-                      <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 relative z-10 shadow-lg shadow-indigo-500/30">
-                        <i className="fa-solid fa-gift text-white" style={{fontSize: '40px'}}></i>
+                      <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 relative z-10 shadow-lg shadow-indigo-500/30">
+                        <i className="fa-solid fa-gift text-white" style={{fontSize: '32px'}}></i>
                       </div>
-                      <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Привет, {tgUser.first_name}!</h2>
-                      <p className="text-slate-500 dark:text-slate-400 mb-6 font-medium text-sm">Мы дарим тебе стартовый бонус, чтобы ты сразу мог начать зарабатывать.</p>
-                      <div className="bg-slate-50 dark:bg-slate-900/50 border-2 border-dashed border-indigo-200 dark:border-indigo-500/30 rounded-2xl p-4 mb-6">
-                        <p className="text-sm text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider mb-1">Твой бонус</p>
-                        <p className="text-4xl font-black text-indigo-600 dark:text-indigo-400">30.00 ₽</p>
+                      <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Забери 30.00 ₽!</h2>
+                      <p className="text-slate-500 dark:text-slate-400 mb-6 font-medium text-sm">Чтобы получить стартовый бонус на баланс, выполни одно простое условие:</p>
+                      
+                      <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 mb-6 space-y-3">
+                        <button onClick={handleOpenSponsor} className="w-full bg-blue-500 text-white font-bold py-3 rounded-xl shadow-md hover:bg-blue-600 active:scale-95 transition-all flex items-center justify-center gap-2">
+                           <TelegramIcon size={18} className="text-white" /> Подписаться на {SPONSOR_CHANNEL_NAME}
+                        </button>
+                        
+                        <button onClick={handleVerifyWelcome} disabled={isVerifyingWelcome} className={`w-full font-bold py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 ${sponsorClicked ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'}`}>
+                           {isVerifyingWelcome ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Проверить подписку'}
+                        </button>
                       </div>
-                      <button onClick={claimWelcomeBonus} className="w-full bg-indigo-600 text-white font-bold text-lg py-4 rounded-xl hover:bg-indigo-500 active:scale-95 transition-all shadow-lg shadow-indigo-500/30">
-                        Забрать бонус
-                      </button>
                     </div>
                   </div>
                 )}
@@ -504,12 +559,43 @@
                   {/* --- ЗАРАБОТАТЬ --- */}
                   {activeTab === 'earn' && (
                     <div className="animate-in fade-in duration-300 space-y-4">
-                      <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/30 rounded-2xl p-4 flex gap-3 items-start">
-                         <i className="fa-solid fa-circle-info text-indigo-500 dark:text-indigo-400 mt-0.5" style={{fontSize: '20px'}}></i>
-                         <div>
-                           <p className="font-bold text-indigo-900 dark:text-indigo-300 text-sm mb-1">Как тут заработать?</p>
-                           <p className="text-xs text-indigo-700 dark:text-indigo-200/70">Нажми перейти, вернись и нажми проверить.</p>
-                         </div>
+                      
+                      {/* === БАННЕР РОЗЫГРЫША === */}
+                      <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-3xl p-5 text-white shadow-lg relative overflow-hidden animate-in fade-in zoom-in duration-500">
+                          <i className="fa-solid fa-gift absolute -right-4 -top-4 opacity-20" style={{fontSize: '110px'}}></i>
+                          <div className="relative z-10">
+                              <div className="flex items-center gap-2 mb-3">
+                                  <span className="bg-white/20 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider backdrop-blur-sm">Розыгрыш</span>
+                                  <h3 className="font-black text-lg">🔥 Грандиозный Конкурс</h3>
+                              </div>
+                              <div className="space-y-1.5 mb-4">
+                                  <p className="text-sm font-bold flex items-center gap-2 bg-black/20 w-fit px-2 py-1 rounded-lg">
+                                      <i className="fa-solid fa-star text-yellow-300"></i> 5 мест: ТГ Premium (1 мес)
+                                  </p>
+                                  <p className="text-sm font-bold flex items-center gap-2 bg-black/20 w-fit px-2 py-1 rounded-lg">
+                                      <i className="fa-solid fa-money-bill-wave text-green-300"></i> 10 мест: 500₽ на баланс
+                                  </p>
+                              </div>
+                              <p className="text-[11px] text-purple-50 mb-3 font-medium leading-relaxed">
+                                  Пригласи как можно больше друзей по своей ссылке. За каждого друга ты также получаешь <b>10%</b> от его заработка навсегда!
+                              </p>
+                              
+                              <button onClick={copyReferralLink} className="w-full bg-white text-purple-600 font-black py-2.5 rounded-xl shadow-md hover:bg-purple-50 active:scale-95 transition-all flex items-center justify-center gap-2">
+                                  {copied ? <i className="fa-solid fa-check text-green-500"></i> : <i className="fa-solid fa-link"></i>}
+                                  {copied ? 'Скопировано!' : 'Скопировать мою ссылку'}
+                              </button>
+
+                              {/* КНОПКА ПОДЕЛИТЬСЯ В ИСТОРИЮ */}
+                              {!dbUser?.storyShared ? (
+                                  <button onClick={shareToStory} className="w-full bg-indigo-500/20 text-white font-bold py-2 rounded-xl border border-indigo-400/50 hover:bg-indigo-500/40 transition-colors text-sm flex items-center justify-center gap-2 mt-2">
+                                      <i className="fa-solid fa-camera"></i> Выложить в Историю (Шансы x2)
+                                  </button>
+                              ) : (
+                                  <div className="w-full bg-green-500/20 text-green-100 font-bold py-2 rounded-xl border border-green-400/50 text-sm flex items-center justify-center gap-2 mt-2">
+                                      <i className="fa-solid fa-check-circle"></i> Шансы удвоены (x2)
+                                  </div>
+                              )}
+                          </div>
                       </div>
 
                       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
@@ -713,7 +799,6 @@
                       </div>
 
                       <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
-                         {/* КНОПКА ПОДДЕРЖКИ ВЕРНУЛАСЬ! */}
                          <button onClick={() => setModal('support')} className="w-full flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                            <div className="flex items-center gap-3">
                              <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
@@ -738,7 +823,7 @@
                            </div>
                            <div className="flex items-center bg-slate-50 dark:bg-slate-900 p-1 pl-4 rounded-xl border border-slate-200 dark:border-slate-700">
                             <span className="text-sm font-medium text-slate-600 dark:text-slate-300 truncate flex-1">t.me/{BOT_USERNAME.replace('@','')}?start={tgUser.id}</span>
-                            <button onClick={() => {navigator.clipboard.writeText(`https://t.me/${BOT_USERNAME.replace('@','')}?start=${tgUser.id}`); showNotif('Скопировано')}} className="bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 p-2.5 rounded-lg ml-2 shadow-sm border border-slate-100 dark:border-slate-600 transition-colors">
+                            <button onClick={copyReferralLink} className="bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 p-2.5 rounded-lg ml-2 shadow-sm border border-slate-100 dark:border-slate-600 transition-colors">
                               {copied ? <i className="fa-solid fa-check" style={{fontSize: '18px'}}></i> : <i className="fa-solid fa-copy" style={{fontSize: '18px'}}></i>}
                             </button>
                           </div>
@@ -747,7 +832,7 @@
                     </div>
                   )}
 
-                  {/* --- АДМИНКА (С БАЗОЙ ЮЗЕРОВ) --- */}
+                  {/* --- АДМИНКА --- */}
                   {activeTab === 'admin' && isAdmin && (
                     <div className="animate-in fade-in duration-300 space-y-4">
                       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-3xl shadow-xl relative overflow-hidden">
@@ -827,7 +912,7 @@
                           </div>
                       )}
 
-                      {/* ВКЛАДКА: ЮЗЕРЫ (БАЗА И ПОПОЛНЕНИЕ) */}
+                      {/* ВКЛАДКА: ЮЗЕРЫ */}
                       {adminTab === 'users' && (
                           <div className="space-y-4 animate-in fade-in">
                               <form onSubmit={handleAdminChangeBalance} className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-4">
@@ -841,7 +926,6 @@
                                 </div>
                               </form>
 
-                              {/* СПИСОК ЮЗЕРОВ С ПОИСКОМ */}
                               <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700">
                                   <div className="flex flex-col gap-3 mb-4">
                                       <h3 className="font-bold text-sm text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
