@@ -50,15 +50,18 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // === НАСТРОЙКИ ===
+        // === ТВОИ НАСТРОЙКИ ===
         const MAKE_WEBHOOK_URL = "https://hook.eu1.make.com/18jk32udu658rvw34jlynirj1chkslo9";
         const ADMIN_TG = "@makaroff_53"; 
         const BOT_USERNAME = "@SocialBux_bot"; 
         const ADMIN_PHONE = "89524839430"; 
         const ADMIN_BANK = "Сбербанк"; 
         const MY_ADMIN_ID = 1014857955; 
+
+        // ИД Твоего магазина в Free-Kassa (для генерации счетов)
+        const FREEKASSA_SHOP_ID = "YOUR_SHOP_ID"; 
         
-        // КАНАЛ ДЛЯ ПОДПИСКИ ЗА 30 РУБЛЕЙ
+        // КАНАЛ ДЛЯ ОБЯЗАТЕЛЬНОЙ ПОДПИСКИ ЗА 30 РУБЛЕЙ
         const SPONSOR_CHANNEL_LINK = "https://t.me/SocialBux"; 
         const SPONSOR_CHANNEL_NAME = "SocialBux";
 
@@ -85,14 +88,18 @@
             setTimeout(() => setNotification(null), 4000);
           };
 
-          // СОСТОЯНИЯ ДЛЯ БОНУСА ЗА ПОДПИСКУ
           const [sponsorClicked, setSponsorClicked] = useState(false);
           const [isVerifyingWelcome, setIsVerifyingWelcome] = useState(false);
+
+          // СОСТОЯНИЯ ДЛЯ FREE-KASSA
+          const [depositTab, setDepositTab] = useState('fk'); // 'fk' или 'sbp'
+          const [depositAmount, setDepositAmount] = useState(100);
+          const [isGeneratingBill, setIsGeneratingBill] = useState(false);
 
           useEffect(() => {
             const initCloud = async () => {
                 if (!window.FirebaseSDK) return setTimeout(initCloud, 200);
-                const { auth, db, signInAnonymously, doc, setDoc, collection, onSnapshot } = window.FirebaseSDK;
+                const { auth, db, signInAnonymously, doc, setDoc, collection, onSnapshot, increment } = window.FirebaseSDK;
 
                 let userId = '987654321';
                 let userName = 'Пользователь';
@@ -124,17 +131,18 @@
                     await signInAnonymously(auth);
 
                     const userRef = doc(db, "users", userId);
-                    onSnapshot(userRef, (docSnap) => {
+                    onSnapshot(userRef, async (docSnap) => {
                         if (docSnap.exists()) {
                             setDbUser(docSnap.data());
                         } else {
                             let refId = null;
                             if (startParam && startParam !== userId) refId = startParam.toString();
                             
-                            setDoc(userRef, {
+                            await setDoc(userRef, {
                                 balance: 0,
                                 bonusClaimed: false,
                                 storyShared: false, 
+                                referralCount: 0, 
                                 usedPromos: [],
                                 completedTasks: [], 
                                 myOrders: [], 
@@ -144,6 +152,11 @@
                             });
 
                             if (refId) {
+                                const referrerRef = doc(db, "users", refId);
+                                updateDoc(referrerRef, {
+                                    referralCount: increment(1)
+                                }).catch(e => console.log(e));
+
                                 fetch(MAKE_WEBHOOK_URL, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
@@ -153,7 +166,7 @@
                         }
                         setIsAppLoading(false); 
                     }, (err) => {
-                        showNotif('Ошибка доступа к базе данных.', 'error');
+                        showNotif('Ошибка доступа к базе.', 'error');
                         setIsAppLoading(false); 
                     });
 
@@ -229,7 +242,6 @@
             } catch (e) {}
           };
 
-          // === НОВЫЙ БОНУС (ОБЯЗАТЕЛЬНАЯ ПОДПИСКА) ===
           const handleOpenSponsor = () => {
               setSponsorClicked(true);
               if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
@@ -320,6 +332,7 @@
             }, 3500); 
           };
 
+          // === СОЗДАНИЕ ЗАКАЗА С ОТПРАВКОЙ РАСШИРЕННЫХ ДАННЫХ ДЛЯ АВТОМАТИЗАЦИИ ===
           const executeOrder = async () => {
             if (balance < totalCost) return showNotif('Недостаточно средств!', 'error');
             const { db, doc, updateDoc, collection, addDoc, increment, arrayUnion } = window.FirebaseSDK;
@@ -355,7 +368,23 @@
                 });
 
                 showNotif(`Заказ на ${totalCost.toFixed(2)} ₽ успешно создан!`, 'success');
-                sendToMake({ action: 'Создал заказ', amount: -totalCost, link: orderForm.link });
+                
+                // РАСШИРЕННЫЙ ЛОГ ДЛЯ ТВОИХ ЛС И УВЕДОМЛЕНИЙ
+                sendToMake({ 
+                    action: 'Новый заказ на накрутку', 
+                    amount: -totalCost, 
+                    link: orderForm.link,
+                    orderDetails: {
+                        user_id: tgUser.id,
+                        user_name: tgUser.first_name,
+                        platform: orderForm.platform,
+                        type: actionLabel,
+                        count: orderForm.count,
+                        spent: totalCost,
+                        link: orderForm.link
+                    }
+                });
+
                 setOrderForm({ ...orderForm, link: '', count: 10 });
                 setBotIsAdminChecked(false); 
                 setModal(null); 
@@ -376,6 +405,68 @@
             executeOrder();
           };
 
+          // === ИНИЦИАЦИЯ ОПЛАТЫ FREE-KASSA ЧЕРЕЗ MAKE.COM ===
+          const handleFreeKassaPayment = async (e) => {
+              e.preventDefault();
+              if (depositAmount < 10) return showNotif('Минимальная сумма пополнения — 10 ₽', 'error');
+              setIsGeneratingBill(true);
+
+              try {
+                  // Отправляем запрос на Make.com, который сгенерирует подписанную ссылку
+                  const res = await fetch(MAKE_WEBHOOK_URL, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                          action: 'Инициация оплаты Free-Kassa',
+                          amount: depositAmount,
+                          telegramId: tgUser.id,
+                          userName: tgUser.first_name
+                      })
+                  });
+                  const data = await res.json();
+                  
+                  if (data && data.paymentUrl) {
+                      showNotif('Счет успешно создан! Перенаправляем...', 'success');
+                      setTimeout(() => {
+                          if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+                              window.Telegram.WebApp.openLink(data.paymentUrl);
+                          } else {
+                              window.open(data.paymentUrl, '_blank');
+                          }
+                          setModal(null);
+                          setIsGeneratingBill(false);
+                      }, 1000);
+                  } else {
+                      // Резервный фронтенд-редирект, если на Make.com еще не настроена генерация
+                      const orderId = `${tgUser.id}_${Date.now()}`;
+                      const directUrl = `https://pay.freekassa.ru/?m=${FREEKASSA_SHOP_ID}&oa=${depositAmount}&o=${orderId}&currency=RUB&us_userid=${tgUser.id}`;
+                      
+                      showNotif('Перенаправляем на оплату Free-Kassa...', 'success');
+                      setTimeout(() => {
+                          if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+                              window.Telegram.WebApp.openLink(directUrl);
+                          } else {
+                              window.open(directUrl, '_blank');
+                          }
+                          setModal(null);
+                          setIsGeneratingBill(false);
+                      }, 1000);
+                  }
+              } catch(err) {
+                  // Прямой редирект при ошибках сети
+                  const orderId = `${tgUser.id}_${Date.now()}`;
+                  const directUrl = `https://pay.freekassa.ru/?m=${FREEKASSA_SHOP_ID}&oa=${depositAmount}&o=${orderId}&currency=RUB&us_userid=${tgUser.id}`;
+                  if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+                      window.Telegram.WebApp.openLink(directUrl);
+                  } else {
+                      window.open(directUrl, '_blank');
+                  }
+                  setModal(null);
+                  setIsGeneratingBill(false);
+              }
+          };
+
+          // === ФУНКЦИИ АДМИНА ===
           const handleAdminAddTask = async (e) => {
              e.preventDefault();
              if (!adminTaskForm.link.startsWith('http')) return showNotif('Укажи нормальную ссылку', 'error');
@@ -454,7 +545,7 @@
                   window.open(tmeLink, '_blank');
               }
 
-              if (!dbUser.storyShared) {
+              if (!dbUser?.storyShared) {
                   const { db, doc, updateDoc } = window.FirebaseSDK;
                   try {
                       await updateDoc(doc(db, "users", tgUser.id.toString()), { storyShared: true });
@@ -527,7 +618,7 @@
                            <TelegramIcon size={18} className="text-white" /> Подписаться на {SPONSOR_CHANNEL_NAME}
                         </button>
                         
-                        <button onClick={handleVerifyWelcome} disabled={isVerifyingWelcome} className={`w-full font-bold py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 ${sponsorClicked ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'}`}>
+                        <button onClick={handleVerifyWelcome} disabled={isVerifyingWelcome} className={`w-full font-bold py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 ${sponsorClicked ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'}`}>
                            {isVerifyingWelcome ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Проверить подписку'}
                         </button>
                       </div>
@@ -561,37 +652,37 @@
                       <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-3xl p-5 text-white shadow-lg relative overflow-hidden animate-in fade-in zoom-in duration-500">
                           <i className="fa-solid fa-gift absolute -right-4 -top-4 opacity-20" style={{fontSize: '110px'}}></i>
                           <div className="relative z-10">
-                              <div className="flex items-center gap-2 mb-3">
+                              <div className="flex items-center justify-between mb-3">
                                   <span className="bg-white/20 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider backdrop-blur-sm">Розыгрыш</span>
-                                  <h3 className="font-black text-lg">🔥 Грандиозный Конкурс</h3>
+                                  {dbUser?.storyShared && (
+                                      <span className="bg-green-500 text-white font-extrabold text-[10px] px-2 py-1 rounded-md shadow-md animate-pulse">
+                                          ШАНСЫ x2 🔥
+                                      </span>
+                                  )}
                               </div>
-                              <div className="space-y-1.5 mb-4">
-                                  <p className="text-sm font-bold flex items-center gap-2 bg-black/20 w-fit px-2 py-1 rounded-lg">
-                                      <i className="fa-solid fa-star text-yellow-300"></i> 5 мест: ТГ Premium (1 мес)
+                              <h3 className="font-black text-xl mb-1">Грандиозный Конкурс! 🏆</h3>
+                              <div className="space-y-1.5 mb-4 mt-2">
+                                  <p className="text-sm font-bold flex items-center gap-2 bg-black/20 w-fit px-2.5 py-1 rounded-lg">
+                                      <i className="fa-solid fa-star text-yellow-300"></i> 1-5 места: ТГ Premium (1 мес)
                                   </p>
-                                  <p className="text-sm font-bold flex items-center gap-2 bg-black/20 w-fit px-2 py-1 rounded-lg">
-                                      <i className="fa-solid fa-money-bill-wave text-green-300"></i> 10 мест: 500₽ на баланс
+                                  <p className="text-sm font-bold flex items-center gap-2 bg-black/20 w-fit px-2.5 py-1 rounded-lg">
+                                      <i className="fa-solid fa-money-bill-wave text-green-300"></i> 6-15 места: 500₽ на баланс
                                   </p>
                               </div>
                               <p className="text-[11px] text-purple-50 mb-3 font-medium leading-relaxed">
-                                  Пригласи как можно больше друзей по своей ссылке. За каждого друга ты также получаешь <b>10%</b> от его заработка навсегда!
+                                  Позови как можно больше друзей по своей ссылке. За каждого приглашенного ты также получаешь <b>10%</b> от его заработка навсегда!
                               </p>
                               
-                              <button onClick={copyReferralLink} className="w-full bg-white text-purple-600 font-black py-2.5 rounded-xl shadow-md hover:bg-purple-50 active:scale-95 transition-all flex items-center justify-center gap-2">
-                                  {copied ? <i className="fa-solid fa-check text-green-500"></i> : <i className="fa-solid fa-link"></i>}
-                                  {copied ? 'Скопировано!' : 'Скопировать мою ссылку'}
-                              </button>
-
-                              {/* КНОПКА ПОДЕЛИТЬСЯ В ИСТОРИЮ */}
-                              {!dbUser?.storyShared ? (
-                                  <button onClick={shareToStory} className="w-full bg-indigo-500/20 text-white font-bold py-2 rounded-xl border border-indigo-400/50 hover:bg-indigo-500/40 transition-colors text-sm flex items-center justify-center gap-2 mt-2">
-                                      <i className="fa-solid fa-camera"></i> Выложить в Историю (Шансы x2)
+                              <div className="flex gap-2">
+                                  <button onClick={copyReferralLink} className="flex-1 bg-white text-purple-600 font-black py-2.5 rounded-xl shadow-md hover:bg-purple-50 active:scale-95 transition-all text-xs flex items-center justify-center gap-1.5">
+                                      {copied ? <i className="fa-solid fa-check text-green-500"></i> : <i className="fa-solid fa-link"></i>}
+                                      {copied ? 'Скопировано!' : 'Реф. ссылка'}
                                   </button>
-                              ) : (
-                                  <div className="w-full bg-green-500/20 text-green-100 font-bold py-2 rounded-xl border border-green-400/50 text-sm flex items-center justify-center gap-2 mt-2">
-                                      <i className="fa-solid fa-check-circle"></i> Шансы удвоены (x2)
-                                  </div>
-                              )}
+                                  
+                                  <button onClick={shareToStory} className="flex-1 bg-indigo-500 text-white font-black py-2.5 rounded-xl shadow-md hover:bg-indigo-600 active:scale-95 transition-all text-xs flex items-center justify-center gap-1.5 border border-indigo-400">
+                                      <i className="fa-solid fa-camera"></i> В Сторис (х2 шанс)
+                                  </button>
+                              </div>
                           </div>
                       </div>
 
@@ -625,7 +716,7 @@
                                 </div>
                                 
                                 {pendingTask === task.id ? (
-                                    <button onClick={() => handleVerifyTask(task)} disabled={checkingTask === task.id} className={`min-w-[90px] font-bold py-2 px-3 rounded-xl text-sm flex justify-center items-center transition-colors shadow-sm ${checkingTask === task.id ? 'bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500' : 'bg-green-500 text-white hover:bg-green-600 active:scale-95'}`}>
+                                    <button onClick={() => handleVerifyTask(task)} disabled={checkingTask === task.id} className={`min-w-[90px] font-bold py-2 px-3 rounded-xl text-sm flex justify-center items-center transition-colors shadow-sm ${checkingTask === task.id ? 'bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500' : 'bg-green-500 text-white hover:bg-green-600 active:scale-95 shadow-md shadow-green-500/10'}`}>
                                         {checkingTask === task.id ? <i className="fa-solid fa-spinner fa-spin" style={{fontSize: '18px'}}></i> : `Проверить`}
                                     </button>
                                 ) : (
@@ -771,7 +862,12 @@
                         </div>
 
                         <h2 className="text-xl font-bold text-slate-800 dark:text-white">{tgUser.first_name}</h2>
-                        <p className="text-slate-400 dark:text-slate-500 text-sm mb-5 font-medium">ID: {tgUser.id}</p>
+                        <p className="text-slate-400 dark:text-slate-500 text-sm font-medium mb-1">ID: {tgUser.id}</p>
+                        
+                        <div className="inline-flex items-center gap-1.5 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-extrabold text-xs px-3 py-1 rounded-full mb-5">
+                            <i className="fa-solid fa-users"></i>
+                            Приглашено друзей: {dbUser?.referralCount || 0}
+                        </div>
                         
                         <div className="flex gap-3 justify-center">
                           <button onClick={() => setModal('deposit')} className="flex-1 bg-slate-800 dark:bg-indigo-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-700 dark:hover:bg-indigo-500 transition-colors">
@@ -820,7 +916,7 @@
                            </div>
                            <div className="flex items-center bg-slate-50 dark:bg-slate-900 p-1 pl-4 rounded-xl border border-slate-200 dark:border-slate-700">
                             <span className="text-sm font-medium text-slate-600 dark:text-slate-300 truncate flex-1">t.me/{BOT_USERNAME.replace('@','')}?start={tgUser.id}</span>
-                            <button onClick={copyReferralLink} className="bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 p-2.5 rounded-lg ml-2 shadow-sm border border-slate-100 dark:border-slate-600 transition-colors">
+                            <button onClick={copyReferralLink} className="bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 p-2.5 rounded-lg ml-2 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
                               {copied ? <i className="fa-solid fa-check" style={{fontSize: '18px'}}></i> : <i className="fa-solid fa-copy" style={{fontSize: '18px'}}></i>}
                             </button>
                           </div>
@@ -848,7 +944,6 @@
                         </div>
                       </div>
 
-                      {/* НАВИГАЦИЯ АДМИНКИ */}
                       <div className="flex bg-slate-200/50 dark:bg-slate-800 p-1 rounded-xl">
                         <button onClick={() => setAdminTab('add')} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${adminTab === 'add' ? 'bg-white dark:bg-slate-700 shadow-sm text-purple-600 dark:text-purple-400' : 'text-slate-500 dark:text-slate-400'}`}>Создать</button>
                         <button onClick={() => setAdminTab('tasks')} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${adminTab === 'tasks' ? 'bg-white dark:bg-slate-700 shadow-sm text-purple-600 dark:text-purple-400' : 'text-slate-500 dark:text-slate-400'}`}>Задания</button>
@@ -948,7 +1043,7 @@
                                               </div>
                                               <div className="text-right">
                                                   <p className="text-xs font-black text-green-500">{u.balance?.toFixed(2) || '0.00'} ₽</p>
-                                                  {u.referrerId && <p className="text-[8px] text-purple-400 mt-0.5 font-bold">Реф: {u.referrerId.slice(-4)}</p>}
+                                                  <p className="text-[9px] text-purple-400 font-extrabold mt-0.5">Реф: {u.referralCount || 0}</p>
                                               </div>
                                           </div>
                                       ))}
@@ -977,6 +1072,10 @@
                             <p className="text-xs text-slate-600 dark:text-slate-400">Деньги за задания зачисляются на баланс сразу после прохождения таймера проверки (3-5 секунд).</p>
                           </div>
                           <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+                            <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-1">Как принять участие в конкурсе?</h4>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">Просто скопируй свою реферальную ссылку и поделись ей в соцсетях. Чтобы удвоить шансы на победу, выложи ссылку в историю, нажав на кнопку «В Сторис».</p>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
                             <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-1">Возникли проблемы?</h4>
                             <p className="text-xs text-slate-600 dark:text-slate-400">Если у вас не засчиталось задание или пропали деньги, свяжитесь напрямую с основателем проекта.</p>
                           </div>
@@ -990,38 +1089,69 @@
                   </div>
                 )}
 
+                {/* === МОДАЛКА ПОПОЛНЕНИЯ (С ВКЛАДКАМИ) === */}
                 {modal === 'deposit' && (
                   <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm z-[150] flex items-end animate-in fade-in duration-200">
                      <div className="bg-white dark:bg-slate-800 w-full rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-full duration-300">
-                        <div className="flex justify-between items-center mb-6">
-                          <h3 className="font-bold text-xl text-slate-800 dark:text-white">Пополнение СБП</h3>
-                          <button onClick={() => setModal(null)} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-full text-slate-500 transition-colors"><i className="fa-solid fa-xmark" style={{fontSize: '20px'}}></i></button>
+                        <div className="flex justify-between items-center mb-5">
+                          <h3 className="font-bold text-xl text-slate-800 dark:text-white">Пополнение баланса</h3>
+                          <button onClick={() => setModal(null)} className="p-2 bg-slate-100 dark:bg-slate-700 rounded-full text-slate-500 transition-colors hover:bg-slate-200"><i className="fa-solid fa-xmark" style={{fontSize: '20px'}}></i></button>
                         </div>
-                        <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-xl mb-5 text-center border border-amber-200 dark:border-amber-800/50">
-                            <i className="fa-solid fa-triangle-exclamation text-amber-500 mb-2" style={{fontSize: '28px'}}></i>
-                            <p className="font-black text-amber-800 dark:text-amber-200 mb-1">ВАЖНО!</p>
-                            <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">Обязательно укажите ваш ID в комментарии к переводу, иначе мы не сможем зачислить средства на ваш аккаунт!</p>
+
+                        {/* ВКЛАДКИ МЕТОДА ОПЛАТЫ */}
+                        <div className="flex bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl mb-5 border border-slate-200/50 dark:border-slate-700">
+                          <button onClick={() => setDepositTab('fk')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${depositTab === 'fk' ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500'}`}>
+                             <i className="fa-solid fa-credit-card"></i> Free-Kassa (Авто)
+                          </button>
+                          <button onClick={() => setDepositTab('sbp')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${depositTab === 'sbp' ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500'}`}>
+                             <i className="fa-solid fa-mobile-screen-button"></i> СБП / Карта (Вручную)
+                          </button>
                         </div>
-                        <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 p-4 rounded-xl mb-6 space-y-3">
-                           <div className="flex justify-between items-center">
-                               <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">Номер (СБП):</span>
-                               <span className="font-black text-sm text-slate-800 dark:text-white">{ADMIN_PHONE}</span>
-                           </div>
-                           <div className="flex justify-between items-center">
-                               <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">Банк:</span>
-                               <span className="font-black text-sm text-slate-800 dark:text-white">{ADMIN_BANK}</span>
-                           </div>
-                           <div className="flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/30 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-800 mt-1">
-                               <span className="text-xs text-indigo-600 dark:text-indigo-400 font-bold">Комментарий:</span>
-                               <div className="flex items-center gap-2">
-                                  <span className="font-black text-sm text-indigo-700 dark:text-indigo-300">{tgUser.id}</span>
-                                  <button onClick={() => {navigator.clipboard.writeText(tgUser.id); showNotif('ID скопирован!', 'success');}} className="text-indigo-500 active:scale-90 transition-transform bg-white dark:bg-slate-800 px-2 py-1 rounded shadow-sm border border-indigo-100 dark:border-indigo-700">
-                                    <i className="fa-solid fa-copy"></i>
-                                  </button>
+
+                        {/* МЕТОД 1: FREE-KASSA */}
+                        {depositTab === 'fk' ? (
+                            <form onSubmit={handleFreeKassaPayment} className="space-y-4">
+                               <div className="bg-slate-50 dark:bg-slate-900/30 p-4 rounded-xl border border-slate-100 dark:border-slate-700/50 text-center">
+                                   <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-medium">Мгновенное автозачисление баланса. Без комиссии!</p>
+                                   <div className="relative max-w-[200px] mx-auto">
+                                       <input type="number" required min="10" max="50000" className="w-full text-center px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:border-indigo-500 dark:text-white font-extrabold text-2xl transition-colors" value={depositAmount} onChange={e => setDepositAmount(parseInt(e.target.value) || 0)} />
+                                       <span className="absolute right-3 top-1/2 -translate-y-1/2 font-extrabold text-slate-400">₽</span>
+                                   </div>
                                </div>
-                           </div>
-                        </div>
-                        <button onClick={() => { setModal(null); showNotif('Ожидайте зачисления 5-15 мин'); }} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-500 transition-colors shadow-md shadow-indigo-500/20">Я перевел деньги</button>
+                               <button type="submit" disabled={isGeneratingBill} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2">
+                                  {isGeneratingBill ? <i className="fa-solid fa-spinner fa-spin"></i> : <React.Fragment><i className="fa-solid fa-bolt"></i> Перейти к оплате</React.Fragment>}
+                               </button>
+                            </form>
+                        ) : (
+                            /* МЕТОД 2: СБП (МАНУАЛ) */
+                            <div className="animate-in fade-in duration-200">
+                                <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-xl mb-5 text-center border border-amber-200 dark:border-amber-800/50">
+                                    <i className="fa-solid fa-triangle-exclamation text-amber-500 mb-2" style={{fontSize: '28px'}}></i>
+                                    <p className="font-black text-amber-800 dark:text-amber-200 mb-1">ВАЖНО!</p>
+                                    <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">Обязательно укажите ваш ID в комментарии к переводу, иначе мы не сможем зачислить средства на ваш аккаунт!</p>
+                                </div>
+                                <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 p-4 rounded-xl mb-6 space-y-3">
+                                   <div className="flex justify-between items-center">
+                                       <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">Номер (СБП):</span>
+                                       <span className="font-black text-sm text-slate-800 dark:text-white">{ADMIN_PHONE}</span>
+                                   </div>
+                                   <div className="flex justify-between items-center">
+                                       <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">Банк:</span>
+                                       <span className="font-black text-sm text-slate-800 dark:text-white">{ADMIN_BANK}</span>
+                                   </div>
+                                   <div className="flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/30 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-800 mt-1">
+                                       <span className="text-xs text-indigo-600 dark:text-indigo-400 font-bold">Комментарий:</span>
+                                       <div className="flex items-center gap-2">
+                                          <span className="font-black text-sm text-indigo-700 dark:text-indigo-300">{tgUser.id}</span>
+                                          <button onClick={() => {navigator.clipboard.writeText(tgUser.id); showNotif('ID скопирован!', 'success');}} className="text-indigo-500 active:scale-90 transition-transform bg-white dark:bg-slate-800 px-2 py-1 rounded shadow-sm border border-indigo-100 dark:border-indigo-700">
+                                            <i className="fa-solid fa-copy"></i>
+                                          </button>
+                                       </div>
+                                   </div>
+                                </div>
+                                <button onClick={() => { setModal(null); showNotif('Ожидайте зачисления 5-15 мин'); }} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-500 transition-colors shadow-md shadow-indigo-500/20">Я перевел деньги</button>
+                            </div>
+                        )}
                      </div>
                   </div>
                 )}
@@ -1098,6 +1228,5 @@
     </script>
 </body>
 </html>
-
 
 ```
